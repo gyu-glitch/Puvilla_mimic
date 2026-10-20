@@ -1,0 +1,154 @@
+{
+  "region": "belly silhouette below the resting arm overlap and above the leg gap; not a whole-mesh claim",
+  "method": "contiguous near-white span from center x640, RGB min>160 and channel range<45",
+  "imageSize": [
+    1280,
+    720
+  ],
+  "measurements": [
+    {
+      "row": 470,
+      "source": [
+        514,
+        765
+      ],
+      "v5": [
+        514,
+        765
+      ]
+    },
+    {
+      "row": 480,
+      "source": [
+        513,
+        766
+      ],
+      "v5": [
+        513,
+        766
+      ]
+    },
+    {
+      "row": 490,
+      "source": [
+        513,
+        766
+      ],
+      "v5": [
+        513,
+        766
+      ]
+    },
+    {
+      "row": 500,
+      "source": [
+        514,
+        766
+      ],
+      "v5": [
+        514,
+        766
+      ]
+    },
+    {
+      "row": 510,
+      "source": [
+        514,
+        765
+      ],
+      "v5": [
+        514,
+        765
+      ]
+    },
+    {
+      "row": 520,
+      "source": [
+        515,
+        764
+      ],
+      "v5": [
+        515,
+        764
+      ]
+    },
+    {
+      "row": 530,
+      "source": [
+        517,
+        763
+      ],
+      "v5": [
+        517,
+        763
+      ]
+    },
+    {
+      "row": 540,
+      "source": [
+        518,
+        761
+      ],
+      "v5": [
+        518,
+        761
+      ]
+    },
+    {
+      "row": 550,
+      "source": [
+        521,
+        758
+      ],
+      "v5": [
+        521,
+        758
+      ]
+    },
+    {
+      "row": 560,
+      "source": [
+        524,
+        755
+      ],
+      "v5": [
+        524,
+        755
+      ]
+    },
+    {
+      "row": 570,
+      "source": [
+        527,
+        751
+      ],
+      "v5": [
+        527,
+        751
+      ]
+    },
+    {
+      "row": 580,
+      "source": [
+        531,
+        748
+      ],
+      "v5": [
+        531,
+        748
+      ]
+    },
+    {
+      "row": 590,
+      "source": [
+        535,
+        744
+      ],
+      "v5": [
+        535,
+        744
+      ]
+    }
+  ],
+  "maxDifferencePx": 0
+}

@@ -77,10 +77,10 @@ void pvArmSurface(vec3 p, vec3 n, out vec3 deformed, out vec3 deformedNormal) {
   float bend=sqrt(dot(uPawWrist[side],uPawWrist[side]));
   if(bend>.00001){
     vec3 hinge=uPawWrist[side]/bend;
-    float bt=clamp((t-.68)/.22,0.0,1.0);
+    float bt=clamp((t-.81)/.05,0.0,1.0);
     float angle=bend*bt*bt*(3.0-2.0*bt)*mask;
-    float derivative=bend*6.0*bt*(1.0-bt)/(.22*length)*mask;
-    vec3 center=uArmOrigin[side]+axis*length*.79;
+    float derivative=bend*6.0*bt*(1.0-bt)/(.05*length)*mask;
+    vec3 center=uArmOrigin[side]+axis*length*.84;
     vec3 v=deformed-center, tangentB=cross(hinge,v), gradient=axis*derivative;
     vec3 corrected=deformedNormal-gradient*dot(tangentB,deformedNormal)/max(.25,1.0+dot(gradient,tangentB));
     deformed=center+pvArmRotate(v,hinge,angle);
@@ -134,6 +134,6 @@ vec3 socketNormal=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));
 normal=normalize(mix(normal,socketNormal,vSocketNormalBlend));
 `);
     };
-    material.customProgramCacheKey = () => cache + "-guide-proportions-v4";
+    material.customProgramCacheKey = () => cache + "-anchored-torso-v5";
   }
 }

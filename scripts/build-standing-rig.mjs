@@ -33,7 +33,7 @@ function distances(seeds,allowed){
  }return d;
 }
 const smooth=(lo,hi,x)=>{const t=Math.min(1,Math.max(0,(x-lo)/(hi-lo)));return t*t*(3-2*t);};
-const weights=P.map(()=>[0,0,0]);const joints={};
+const weights=P.map(()=>[0,0,0]);const joints={},armInterior=new Set();
 for(const side of [-1,1]){
  const visited=new Set(),rungs=[];
  for(const [id,e] of edges){
@@ -56,12 +56,15 @@ for(const side of [-1,1]){
  if(faces.size<100||faces.size>Q.length*.3)throw new Error(`Invalid arm region: ${faces.size}`);
  const arm=new Set([...faces].flatMap(f=>Q[f])),torso=new Set(P.map((_,i)=>i).filter(i=>!arm.has(i)||baseSet.has(i)));
  const da=distances(base,arm),dt=distances(base,torso),socket=mean(base);
+ for(const i of arm)if(!baseSet.has(i))armInterior.add(i);
  const max=Math.max(...[...arm].map(i=>da[i]));
  const at=t=>mean([...arm].filter(i=>Math.abs(da[i]-max*t)<3));
  const shoulder=[socket[0]-side*2,socket[1],socket[2]],elbow=at(.50),hand=at(.90);
  joints[side>0?'L':'R']={shoulder,elbow,hand};
  for(let i=0;i<P.length;i++){
-  let w=arm.has(i)? .60+.40*smooth(0,13,da[i]) : .60*(1-smooth(0,11,dt[i]));
+  // Torso vertices are anchors. Blend on the arm side of the socket only;
+  // raising a hand must not pull the belly or flank into the shoulder.
+  let w=arm.has(i)? smooth(0,18,da[i]) : 0;
   if(!Number.isFinite(w))w=0;
   w*=smooth(15,22,Math.abs(P[i][0]))*(1-smooth(110,119,P[i][1]));
   weights[i][side>0?0:1]=w;
@@ -93,7 +96,8 @@ if(sections){
  }
 }
 const corrective=socketCorrective(P,neighbors,weights,joints);
-const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints,corrective};
+const torsoAnchors=P.map((_,i)=>i).filter(i=>!armInterior.has(i));
+const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints,corrective,torsoAnchors};
 const suffix=process.argv.includes('--portrait')?'_portrait':process.argv.includes('--sections')?'_sections':process.argv.includes('--legacy')?'_legacy':'';
 writeFileSync(`public/models/stand_connected_rig${suffix}.json`,JSON.stringify(data));
 console.log(`Saved connected rig: ${P.length} cage vertices, original topology unchanged.`);

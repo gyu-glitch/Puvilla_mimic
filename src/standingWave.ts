@@ -1,12 +1,12 @@
 import type { BodyPose, V3 } from './body';
 
 export function standingWaveMotion(time: number) {
-  // Two relaxed waves followed by a rest; C2 envelope avoids a rhythmic jerk
-  // at either end. The wrist leads, with only a small delayed forearm response.
+  // Hold the plush paw as one shape. A small elbow rotation gives the greeting
+  // without a travelling bend through the forearm or a wobbling wrist.
   const phase=((time%4.6)+4.6)%4.6;
   const envelope=phase<3.2?Math.pow(Math.sin(Math.PI*phase/3.2),2):0;
   const swing=(lag:number)=>Math.sin((phase-lag)*Math.PI*2*.86)*envelope;
-  return {upper:2.32+.012*swing(.14),bend:.48+.035*swing(.09),wrist:.12+.22*swing(0),depth:.08};
+  return {upper:2.32,bend:.48+.09*swing(0),wrist:0,depth:.08};
 }
 
 /** Reference greeting input, fed through the same retargeter as camera poses. */

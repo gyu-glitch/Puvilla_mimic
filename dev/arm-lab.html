@@ -25,6 +25,7 @@ cfg.character.modelPath='/models/pu_stand.obj'; cfg.outfit.seatBody=false; cfg.o
 cfg.body.enabled=true;cfg.body.armRaiseMaxRad=3;cfg.character.idleBreathAmp=0;
 cfg.scene.layout='landscape';cfg.scene.viewCenterCm=103;cfg.scene.viewHeightCm=220;cfg.scene.aspect=1.35;cfg.scene.cameraTiltDeg=0;
 if(new URLSearchParams(location.search).get('crop')==='portrait'){cfg.scene.viewCenterCm=128;cfg.scene.viewHeightCm=155;cfg.scene.aspect=1.26;}
+if(new URLSearchParams(location.search).get('crop')==='baseline'){cfg.scene.viewCenterCm=133;cfg.scene.viewHeightCm=90;cfg.scene.aspect=16/9;cfg.scene.cameraTiltDeg=-6;}
 cfg.filter.enabled=false;cfg.filter.oil.enabled=false;
 cfg.scene.bgTop='#6b7680';cfg.scene.bgBottom='#48535e';
 const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
@@ -52,7 +53,7 @@ document.querySelector('#capture').addEventListener('click',async()=>{
  scene.render();const src=controls.look.value==='final'?document.querySelector('#app + canvas'):scene.renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;
  const ctx=out.getContext('2d'),bg=ctx.createLinearGradient(0,0,0,out.height);bg.addColorStop(0,cfg.scene.bgTop);bg.addColorStop(1,cfg.scene.bgBottom);
  ctx.fillStyle=bg;ctx.fillRect(0,0,out.width,out.height);if(backdrop)ctx.drawImage(backdrop.canvas,0,0,out.width,out.height);ctx.drawImage(src,0,0);
- const name=`codex-v4-arm-${cfg.body.armRig}-${controls.pose.value}-${controls.view.value}`;
+ const name=`codex-v5-${qp.get('crop')??'full'}-${qp.get('source')==='1'?'source':controls.pose.value}-${controls.view.value}`;
  const response=await fetch('/__mimic/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data:out.toDataURL('image/png')})});
  document.querySelector('#capture').textContent=response.ok?'PNG 기록 완료':'저장 실패';
 });
@@ -68,7 +69,7 @@ document.querySelector('#record').addEventListener('click',()=>{
   recordEpoch=null;
   stream.getTracks().forEach(track=>track.stop());
   const data=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(new Blob(chunks,{type:'video/webm'}));});
-  const name=`codex-v4-${controls.pose.value}-${controls.view.value}`;
+  const name=`codex-v5-${controls.pose.value}-${controls.view.value}`;
   const response=await fetch('/__mimic/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})});
   button.textContent=response.ok?'영상 기록 완료':'영상 저장 실패';button.disabled=false;
  };
@@ -105,7 +106,7 @@ function pose(t){
 let last=performance.now(),frames=0,stamp=last;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
  const poseTime=recordEpoch===null?now/1000:Math.max(0,(now-recordEpoch)/1000);
- character.setState({state:'MIMIC',elapsedMs:now,progress:1});character.apply(NEUTRAL_PARAMS,dt,now/1000,pose(document.querySelector('#hold').checked?0:poseTime));scene.render();frames++;
+ character.setState({state:'MIMIC',elapsedMs:now,progress:1});if(qp.get('source')!=='1')character.apply(NEUTRAL_PARAMS,dt,now/1000,pose(document.querySelector('#hold').checked?0:poseTime));scene.render();frames++;
  if(now-stamp>1000){document.querySelector('#status').textContent=`원본 pu_stand.obj · ${controls.pose.selectedOptions[0].textContent}\n${Math.round(frames*1000/(now-stamp))} fps · 손/어깨/겨드랑이 형태 비교`;frames=0;stamp=now;}
  requestAnimationFrame(frame);
 }requestAnimationFrame(frame);

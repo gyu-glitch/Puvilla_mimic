@@ -1091,7 +1091,7 @@ export class PuuvillaCharacter implements CharacterRig {
             .applyQuaternion(arm.qUpper.clone().invert()).applyQuaternion(arm.qFore.clone().invert());
           wristTarget.crossVectors(arm.restFore,palm);
           if(wristTarget.lengthSq()>.000001)
-            wristTarget.normalize().multiplyScalar(Math.min(.42,arm.restFore.angleTo(palm)));
+            wristTarget.normalize().multiplyScalar(Math.min(.18,arm.restFore.angleTo(palm)));
         }
         this.armSurface.wrist.value[i].lerp(wristTarget,k);
       }
