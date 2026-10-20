@@ -1,0 +1,71 @@
+diff --git a/src/character/puuvilla.ts b/src/character/puuvilla.ts
+index cda812c..91b0365 100644
+--- a/src/character/puuvilla.ts
++++ b/src/character/puuvilla.ts
+@@ -574,7 +574,7 @@ export class PuuvillaCharacter implements CharacterRig {
+           skin.setAttribute('position',new THREE.Float32BufferAttribute(part.positions.flat(),3));
+           skin.setAttribute('connectedArmWeights',new THREE.Float32BufferAttribute(standingRig.weights.flat(),3));
+           this.applySkinWeights(skin,1,true);
+-          this.cageSurface=new StandingCageSurface(part,ch.subdivLevels,standingRig,skin,geo,this.armSurface,cfg.body.armCageRounded!==false);
++          this.cageSurface=new StandingCageSurface(part,ch.subdivLevels,standingRig,skin,geo,this.armSurface,cfg.body.armCageRounded!==false,cfg.body.armInnerFold===true);
+         }else this.armSurface.normalProbes.value=socketNormalProbes(geo);
+       }
+       const add = (mat: THREE.Material, order: number) => {
+diff --git a/src/character/standingCageSurface.ts b/src/character/standingCageSurface.ts
+index 7c8f75b..637e2df 100644
+--- a/src/character/standingCageSurface.ts
++++ b/src/character/standingCageSurface.ts
+@@ -29,7 +29,7 @@ export class StandingCageSurface {
+   private previousState:number[]=[];
+   evaluationCount=0;
+   lastMilliseconds=0;
+-  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true){
++  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true,private innerFold=false){
+     this.plans=subdivisionPlans(part,levels);
+     this.points=new Float64Array(part.positions.length*3);
+     const fine=subdivide(part,levels);
+@@ -93,7 +93,7 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
+       const bone=side===0?4:6,upper=axis.clone().transformDirection(this.matrices[bone]),fore=axis.clone().transformDirection(this.matrices[bone+1]);
+       const hinge=upper.clone().cross(fore).normalize(),theta=upper.angleTo(fore),len=this.lengths[side];
+       const width=Math.min(.60*len,Math.max(.36*len,theta*.32*len));
+-      return {bone,upper,fore,hinge,theta,width,frame:new RoundedElbowFrame(len,upper,fore),origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
++      return {bone,upper,fore,hinge,inward:hinge.clone().cross(upper).normalize(),theta,width,frame:new RoundedElbowFrame(len,upper,fore),origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
+     }):null;
+     for(let i=0;i<this.part.positions.length;i++){
+       p.fromArray(this.part.positions[i]);const side=p.x>=0?0:1,w=this.rig.weights[i],mask=Math.min(1,w[0]+w[1]);
+@@ -123,7 +123,22 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
+           const b=bends[side],distance=v.copy(local).sub(origin).dot(axis);
+           const center=b.frame.center(distance,sum).add(b.origin);
+           v.addScaledVector(axis,-distance).applyQuaternion(this.real[b.bone]);
+-          v.applyAxisAngle(b.hinge,b.theta*smooth(.5*len-.5*b.width,.5*len+.5*b.width,distance));
++          const start=.5*len-.5*b.width,u=Math.max(0,Math.min(1,(distance-start)/b.width));
++          const angle=b.theta*smooth(start,start+b.width,distance);
++          if(this.innerFold){
++            const curvature=b.theta*6*u*(1-u)/b.width;
++            if(curvature>1e-6){
++              const radius=1/curvature,depth=v.dot(b.inward),threshold=.90*radius;
++              // Prevent the inner skin offset passing beyond the local bend
++              // center. Only the compressed side of the elbow is affected;
++              // the outer contour, wrist and paw remain untouched.
++              if(depth>threshold){
++                const room=.08*radius,target=threshold+room*(1-Math.exp(-(depth-threshold)/room));
++                v.addScaledVector(b.inward,target-depth);
++              }
++            }
++          }
++          v.applyAxisAngle(b.hinge,angle);
+           p.lerp(center.add(v),blend);
+         }
+       }
+diff --git a/src/config.ts b/src/config.ts
+index 808a96a..5d1c8a7 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -275,6 +275,7 @@ export interface Config {
+     armTorsoClearance?: boolean;
+     armPawContact?: boolean;
+     armElbowPlane?: boolean;
++    armInnerFold?: boolean;
+   };
+   scene: {
+     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
