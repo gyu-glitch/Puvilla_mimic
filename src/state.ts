@@ -46,22 +46,24 @@ export class MimicStateMachine {
     for (const l of this.listeners) l(from, to);
   }
 
-  update(sig: FaceSignal, nowMs: number): StateSnapshot {
+  update(sig: FaceSignal, nowMs: number, trackedBodyPresent=false): StateSnapshot {
     const p = this.cfg.presence;
     const c = this.cfg.character;
     const elapsed = nowMs - this.enteredAt;
 
     // 멀어짐 타이머 — MIMIC 중에만 의미 있음
-    if (sig.present && sig.near) this.awayAt = null;
+    const near=(sig.present && sig.near) || (!sig.present && trackedBodyPresent &&
+      (this.state==="MIMIC" || this.state==="ENTER"));
+    if (near) this.awayAt = null;
     else if (this.awayAt === null) this.awayAt = nowMs;
 
     switch (this.state) {
       case "IDLE":
-        if (sig.present && sig.near) this.go("ENTER", nowMs);
+        if (near) this.go("ENTER", nowMs);
         else if (elapsed >= p.attractAfterMs) this.go("ATTRACT", nowMs);
         break;
       case "ATTRACT":
-        if (sig.present && sig.near) this.go("ENTER", nowMs);
+        if (near) this.go("ENTER", nowMs);
         break;
       case "ENTER":
         if (elapsed >= c.enterDurationMs) this.go("MIMIC", nowMs);
@@ -71,7 +73,7 @@ export class MimicStateMachine {
         break;
       case "EXIT":
         // 퇴장 중 다시 다가오면 바로 복귀 (반복 재미)
-        if (sig.present && sig.near) this.go("ENTER", nowMs);
+        if (near) this.go("ENTER", nowMs);
         else if (elapsed >= c.exitDurationMs) this.go("IDLE", nowMs);
         break;
     }

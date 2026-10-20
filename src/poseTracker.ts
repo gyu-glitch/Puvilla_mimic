@@ -8,6 +8,7 @@ export interface RawPose {
   world: { x: number; y: number; z: number; visibility: number }[];
   /** Normalized image positions: world coordinates can hallucinate an off-screen wrist. */
   image?: { x: number; y: number }[];
+  imageAspect?: number;
   /** 이미지 좌표(0~1, 미러 전) 코·어깨 — 얼굴 대상과 같은 사람인지 맞출 때 사용 */
   nose: { x: number; y: number };
   shoulderW: number;
@@ -79,6 +80,7 @@ export class PoseTracker {
       return {
         world: w.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 })),
         image: lm.map((p) => ({ x: p.x, y: p.y })),
+        imageAspect: video.videoWidth/video.videoHeight,
         nose: { x: lm[0].x, y: lm[0].y },
         shoulderW: Math.hypot(lm[11].x - lm[12].x, lm[11].y - lm[12].y),
       };

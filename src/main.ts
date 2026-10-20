@@ -10,6 +10,7 @@ import { PuuvillaCharacter } from "./character/puuvilla";
 import { SimInput } from "./sim";
 import { PoseTracker } from "./poseTracker";
 import { BodyProcessor, type BodyPose } from "./body";
+import { BodyTargetLock } from "./bodyTarget";
 import { LockZoneEditor } from "./lockZone";
 import { ExpressionTest } from "./expressionTest";
 import { lightMobile, qualityParam } from "./mobile";
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
 
   const signals = new SignalProcessor(cfg);
   const bodyProc = new BodyProcessor(cfg);
+  const bodyTarget = new BodyTargetLock();
   const fsm = new MimicStateMachine(cfg);
   const scene = new Scene(document.getElementById("app")!, cfg.scene, cfg.character, cfg.filter);
   // 배경 (가운데 아래 버튼으로 주황 ↔ 겨울 마을) — 키오스크는 공용 설정 그대로 주황
@@ -215,15 +217,15 @@ async function main(): Promise<void> {
       lastInferMs = track.inferenceMs;
     }
     sig = sim ? sim.update(dt) : signals.update(track, now);
-    snap = fsm.update(sig, now);
 
     let poseMs = 0;
     if (sim) body = sim.body(now / 1000);
     else if (poseTracker) {
       const pr = poseTracker.update(video, now);
       poseMs = pr.inferenceMs;
-      body = bodyProc.update(signals.target ? BodyProcessor.pickForFace(pr.poses, signals.target) : null, pr.fresh, now);
+      body = bodyProc.update(bodyTarget.update(pr.poses, signals.target, pr.fresh, now), pr.fresh, now);
     } else body = null;
+    snap = fsm.update(sig, now, body!==null);
 
     const params = snap.state === "MIMIC" || snap.state === "ENTER" ? mapSignal(sig, cfg.mapping) : NEUTRAL_PARAMS;
     character.setState(snap);

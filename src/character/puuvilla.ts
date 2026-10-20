@@ -186,6 +186,8 @@ export class PuuvillaCharacter implements CharacterRig {
   private cur: CharacterParams = { ...NEUTRAL_PARAMS };
   /** 개발: 손 흔들기 강제 (0~1) — __mimic.character.debugWave = 1 */
   debugWave = 0;
+  /** Development comparison only; never enabled by production configuration. */
+  debugLegacyArmFrame = false;
   /** Development comparison; null keeps the normal raised-paw roll. */
   debugPawTurn: number | null = null;
 
@@ -1021,6 +1023,12 @@ export class PuuvillaCharacter implements CharacterRig {
     }
 
     // ── 팔 ──
+    // Camera-follow directions must be converted through the chest actually
+    // rendered, not the full human torso rotation (the rendered torso has gains,
+    // clamps and smoothing). Otherwise opposite arms acquire opposite drift.
+    const armFrame=this.connectedArms&&this.cfg.body.armFollowPose&&!this.debugLegacyArmFrame
+      ? new THREE.Quaternion().multiplyQuaternions(spine.quaternion,chest.quaternion)
+      : humanTorso;
     const fa = this.cfg.character;
     const upperContacts=[false,false];
     const resting=this.arms.map(arm=>!!(this.connectedArms&&mimic&&this.cfg.body.enabled&&
@@ -1041,7 +1049,7 @@ export class PuuvillaCharacter implements CharacterRig {
       }
       if(!pose||conf<this.cfg.body.minVisibility)this.elbowPlanes[arm.side>0?0:1].reset();
       if (pose && conf >= this.cfg.body.minVisibility) {
-        this.solveArm(arm, pose, humanTorso, tu, tf, dtSec);
+        this.solveArm(arm, pose, armFrame, tu, tf, dtSec);
       } else if (resting[arm.side>0?0:1]) {
         // Uncertain camera input returns to the supplied model's rest, with no stale contact bend.
         tu.copy(_qIdle); tf.copy(_qIdleF);
@@ -1141,12 +1149,12 @@ export class PuuvillaCharacter implements CharacterRig {
         if(across && this.debugPawTurn===null){
           const humanFore=vec(arm.side>0?pose!.wristL:pose!.wristR)
             .sub(vec(arm.side>0?pose!.elbowL:pose!.elbowR)).normalize()
-            .applyQuaternion(humanTorso.clone().invert());
+            .applyQuaternion(armFrame.clone().invert());
           if(this.cfg.body.armPawFrame){
             trackedRoll=standingPawRoll(arm.restFore,arm.qUpper,arm.qFore,target,
-              humanFore,vec(across).applyQuaternion(humanTorso.clone().invert()));
+              humanFore,vec(across).applyQuaternion(armFrame.clone().invert()));
           }else{
-          const tracked=vec(across).applyQuaternion(humanTorso.clone().invert())
+          const tracked=vec(across).applyQuaternion(armFrame.clone().invert())
             .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(humanFore,direction));
           const reference=new THREE.Vector3(-arm.side,0,0);
           reference.addScaledVector(direction,-reference.dot(direction)).normalize();
@@ -1169,8 +1177,8 @@ export class PuuvillaCharacter implements CharacterRig {
         if(handDirection){
           const humanFore=vec(arm.side>0?pose!.wristL:pose!.wristR)
             .sub(vec(arm.side>0?pose!.elbowL:pose!.elbowR)).normalize()
-            .applyQuaternion(humanTorso.clone().invert());
-          const palm=vec(handDirection).normalize().applyQuaternion(humanTorso.clone().invert())
+            .applyQuaternion(armFrame.clone().invert());
+          const palm=vec(handDirection).normalize().applyQuaternion(armFrame.clone().invert())
             .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(humanFore,direction))
             .applyQuaternion(arm.qUpper.clone().invert()).applyQuaternion(arm.qFore.clone().invert());
           wristTarget.crossVectors(arm.restFore,palm);

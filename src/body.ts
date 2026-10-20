@@ -1,6 +1,8 @@
 import type { Config } from "./config";
 import type { RawPose } from "./poseTracker";
 import { OneEuroBank } from "./smoothing";
+import { Quaternion, Vector3 } from "three";
+import { alignedCameraArm } from "./armImageAlignment";
 
 export type V3 = [number, number, number];
 
@@ -36,6 +38,7 @@ export class BodyProcessor {
     L: { active: false, since: -Infinity, samples: 0 },
     R: { active: false, since: -Infinity, samples: 0 },
   };
+  private lastArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
 
   constructor(private cfg: Config) {
     const b = cfg.body;
@@ -67,6 +70,7 @@ export class BodyProcessor {
   private loseArm(s: "L" | "R"): void {
     const state = this.armState[s];
     state.active = false; state.since = -Infinity; state.samples = 0;
+    this.lastArmVectors[s]=null;
     for (const joint of ["elbow", "wrist", "handAcross", "handDirection"]) this.bank.resetPrefix(`${joint}${s}`);
   }
 
@@ -114,7 +118,14 @@ export class BodyProcessor {
     };
     for (const s of ["L", "R"] as const) {
       const state = this.armState[s], ids = side[s].slice(0, 3);
-      const threshold = Math.max(this.cfg.body.minVisibility, state.active ? .65 : .75);
+      const vectors=ids.slice(1).map(i=>usable(i)&&usable(ids[0])
+        ? [w[i].x-w[ids[0]].x,w[i].y-w[ids[0]].y,w[i].z-w[ids[0]].z] as V3 : [0,0,0] as V3);
+      const previous=this.lastArmVectors[s];
+      const continuous=state.active && previous && vectors.every((v,i)=>
+        Math.hypot(...v.map((x,k)=>x-previous[i][k]))<=.06);
+      // A steady raised arm should not drop merely because visibility drifts
+      // below the acquisition threshold. Uncertain jumps still release it.
+      const threshold = Math.max(this.cfg.body.minVisibility, continuous ? .5 : .65);
       const inFrame = ids.every(i => !raw.image || (raw.image[i] &&
         Number.isFinite(raw.image[i].x) && Number.isFinite(raw.image[i].y) &&
         raw.image[i].x >= 0 && raw.image[i].x <= 1 && raw.image[i].y >= 0 && raw.image[i].y <= 1));
@@ -133,6 +144,7 @@ export class BodyProcessor {
         state.active = nowMs - state.since >= 180 && state.samples >= 3;
       }
       if (!state.active) armConfidence[s] = 0;
+      else this.lastArmVectors[s]=vectors;
     }
     const t = nowMs / 1000;
 
@@ -140,6 +152,19 @@ export class BodyProcessor {
       shoulderL: pick(side.L[0]), elbowL: pick(side.L[1]), wristL: pick(side.L[2]), hipL: pick(side.L[3]),
       shoulderR: pick(side.R[0]), elbowR: pick(side.R[1]), wristR: pick(side.R[2]), hipR: pick(side.R[3]),
     };
+    const handFrames: {L?:Quaternion;R?:Quaternion}={};
+    for (const s of ["L","R"] as const) {
+      if (armConfidence[s]===0) continue;
+      const aligned=alignedCameraArm(raw,side[s],mirror);
+      if (!aligned) continue;
+      const shoulder=new Vector3(...pts[`shoulder${s}`]),elbow=new Vector3(...pts[`elbow${s}`]);
+      const oldFore=new Vector3(...pts[`wrist${s}`]).sub(elbow);
+      const upperLength=elbow.distanceTo(shoulder),foreLength=oldFore.length();
+      handFrames[s]=new Quaternion().setFromUnitVectors(oldFore.normalize(),aligned.fore);
+      elbow.copy(shoulder).addScaledVector(aligned.upper,upperLength);
+      pts[`elbow${s}`]=elbow.toArray();
+      pts[`wrist${s}`]=elbow.addScaledVector(aligned.fore,foreLength).toArray();
+    }
     for (const k of KEYS) {
       const armSide = k.endsWith("L") ? "L" : "R";
       if ((k.startsWith("elbow") || k.startsWith("wrist")) && armConfidence[armSide] < this.cfg.body.minVisibility) continue;
@@ -169,11 +194,16 @@ export class BodyProcessor {
       const a=pick(index),b=pick(pinky),span=a.map((v,i)=>v-b[i]) as V3;
       const length=Math.hypot(...span);
       if(length<.015||length>.20)continue;
-      hands[`handAcross${s}`]=span.map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v/length,t)) as V3;
+      const spanAligned=new Vector3(...span).divideScalar(length);
+      if(handFrames[s])spanAligned.applyQuaternion(handFrames[s]);
+      hands[`handAcross${s}`]=spanAligned.toArray().map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v,t)) as V3;
       const wrist=pick(side[s][2]),forward=a.map((v,i)=>(v+b[i])*.5-wrist[i]) as V3;
       const reach=Math.hypot(...forward);
-      if(reach>=.025&&reach<=.18)
-        hands[`handDirection${s}`]=forward.map((v,i)=>this.bank.filter(`handDirection${s}${i}`,v/reach,t)) as V3;
+      if(reach>=.025&&reach<=.18){
+        const forwardAligned=new Vector3(...forward).divideScalar(reach);
+        if(handFrames[s])forwardAligned.applyQuaternion(handFrames[s]);
+        hands[`handDirection${s}`]=forwardAligned.toArray().map((v,i)=>this.bank.filter(`handDirection${s}${i}`,v,t)) as V3;
+      }
     }
     this.last = {
       ...pts,
