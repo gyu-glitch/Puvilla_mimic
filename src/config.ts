@@ -49,6 +49,7 @@ export interface Config {
     dCutoff: number;
   };
   presence: {
+    /** 얼굴 높이 / 입력 영상의 짧은 변. 가로 입력에서는 기존 화면 높이 비율과 같다. */
     enterBboxHeight: number;
     exitBboxHeight: number;
     centerToleranceX: number;

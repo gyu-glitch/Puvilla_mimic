@@ -12,6 +12,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "camera:check": "node --experimental-transform-types scripts/check-camera-startup.mjs",
+    "presence:check": "node --experimental-transform-types scripts/check-presence-aspect.mjs",
     "kiosk:win": "scripts\\kiosk.cmd",
     "kiosk:mac": "sh scripts/kiosk.sh",
     "build:single": "npm run build && node scripts/build-single.mjs",

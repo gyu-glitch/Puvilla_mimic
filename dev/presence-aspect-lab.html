@@ -1,0 +1,42 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8">
+<title>세로 입력 미믹 시작 검증</title>
+<style>body{margin:0;color:white;font:15px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>합성 세로 얼굴·팔 신호 → 실제 상태머신·캐릭터
+<button id="before">이전 판정</button><button id="after">수정 판정</button>
+<div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal,NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {standingWavePose} from '/src/standingWave.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();
+cfg.scene.outputMirror=false;cfg.scene.layout='landscape';
+cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
+await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);
+scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let corrected=false,processor=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg),start=performance.now(),last=start;
+for(const [id,fixed] of [['before',false],['after',true]])document.querySelector('#'+id).onclick=()=>{
+ corrected=fixed;processor=new SignalProcessor(cfg);fsm=new MimicStateMachine(cfg);start=performance.now();
+};
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ const t=(now-start)/1000,h=.25*9/16;
+ const track={faces:[{bbox:{x:.44,y:.3-h/2,w:.12,h,cx:.5,cy:.3},
+  yaw:20*Math.sin(t),pitch:8*Math.cos(t),roll:0,blend:{},mouth:{open:.12,corner:.02},eyes:{left:.2,right:.2}}],inferenceMs:10};
+ const signal=processor.update(track,now,corrected?9/16:1);
+ const state=fsm.update(signal,now);
+ const p=state.state==='MIMIC'||state.state==='ENTER'?mapSignal(signal,cfg.mapping):NEUTRAL_PARAMS;
+ ch.setState(state);ch.apply(p,dt,now/1000,standingWavePose(t,1,1));scene.render();
+ document.querySelector('#status').textContent=
+ `${corrected?'수정':'이전'} | 입력 9:16 | 얼굴 LOCK ${processor.debugFaces[0]?.locked} | 원본 높이 ${h.toFixed(3)} | 접근 크기 ${signal.bboxH.toFixed(3)} (시작 기준 ${cfg.presence.enterBboxHeight}) | ${state.state}`;
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

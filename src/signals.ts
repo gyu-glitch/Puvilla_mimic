@@ -9,7 +9,7 @@ export type Expression = "neutral" | "smile" | "surprise";
 export interface FaceSignal {
   present: boolean; // 추적 대상 얼굴이 있음(홀드 포함)
   near: boolean; // 접근 판정(히스테리시스 적용)
-  bboxH: number;
+  bboxH: number; // face height relative to input short side (presence threshold)
   cx: number; // 0~1, 미러 반영
   yaw: number; // deg, 미러 반영
   pitch: number;
@@ -152,7 +152,7 @@ export class SignalProcessor {
     return this.lastTarget;
   }
 
-  update(track: TrackResult, nowMs: number): FaceSignal {
+  update(track: TrackResult, nowMs: number, imageAspect = 1): FaceSignal {
     const t = nowMs / 1000;
     const p = this.cfg.presence;
     const mirror = this.cfg.camera.mirror ? -1 : 1;
@@ -164,7 +164,11 @@ export class SignalProcessor {
       const yaw = this.fYaw.filter(target.yaw * mirror, t);
       const pitch = this.fPitch.filter(target.pitch, t);
       const roll = this.fRoll.filter(target.roll * mirror, t);
-      const bboxH = this.fBbox.filter(target.bbox.h, t);
+      // Preserve landscape distance tuning while using the short side for a
+      // portrait source. Otherwise a locked portrait face can never enter
+      // MIMIC at the same framing: its normalized height is much smaller.
+      const shortSide = Number.isFinite(imageAspect) && imageAspect > 0 ? Math.min(1, imageAspect) : 1;
+      const bboxH = this.fBbox.filter(target.bbox.h / shortSide, t);
       const cxRaw = this.cfg.camera.mirror ? 1 - target.bbox.cx : target.bbox.cx;
       const cx = this.fCx.filter(cxRaw, t);
 

@@ -216,7 +216,7 @@ async function main(): Promise<void> {
       inferFrames++;
       lastInferMs = track.inferenceMs;
     }
-    sig = sim ? sim.update(dt) : signals.update(track, now);
+    sig = sim ? sim.update(dt) : signals.update(track, now, video.videoWidth / video.videoHeight);
 
     let poseMs = 0;
     if (sim) body = sim.body(now / 1000);

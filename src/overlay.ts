@@ -42,9 +42,9 @@ export class Overlay {
 
     const f1 = this.gui.addFolder("접근 판정 — 언제 등장/퇴장할지");
     f1.add(cfg.presence, "enterBboxHeight", 0.05, 0.6, 0.005)
-      .name("등장: 얼굴 크기 ≥ (화면 높이 비율)");
+      .name("등장: 얼굴 크기 ≥ (입력 짧은 변 비율)");
     f1.add(cfg.presence, "exitBboxHeight", 0.03, 0.5, 0.005)
-      .name("멀어짐: 얼굴 크기 ≤ (화면 높이 비율)");
+      .name("멀어짐: 얼굴 크기 ≤ (입력 짧은 변 비율)");
     f1.add(cfg.presence, "centerToleranceX", 0.05, 0.5, 0.01)
       .name("중앙 인정 범위 (화면 폭 비율, ±)");
     f1.add(cfg.presence, "faceLostHoldMs", 0, 3000, 50)

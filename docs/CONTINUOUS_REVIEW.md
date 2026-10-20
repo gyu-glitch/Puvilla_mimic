@@ -499,3 +499,13 @@
 - 이전 공개 v31 및 current.before-codex-v36.txt 복구 포인터 보존. Claude 소스와 preview.txt 미수정. 새 빌드는 v32~v35의 기존 개발 수정도 포함한다.
 - 공개 HTTPS config.build=codex-20261020-122553, index-CDkZWGaY.js 확인. 카메라 주소 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-122553 . 이후 개발은 기존 :10000 주소에서 계속하며 추가 공개 반영을 자동 수행하지 않는다.
 - 공개 실제 렌더와 좌하단 ↔ 버튼 표시, 콘솔 오류0 확인. codex-v36-public.png 보존. 실제 OBS 입력 검증 여부는 이전 기록과 동일하다.
+
+## v37 세로 입력에서 LOCK 이후 미믹 진입 차단
+
+- 공개 반영 직후 사용자가 움직여도 반응이 없다고 사진을 보냈다. 사진에는 세로 카메라와 얼굴 LOCK이 보였다. v36에서 입력/표시 비율만 수정하고 접근 판정의 기준까지 함께 수정하지 못했다.
+- 재현: 얼굴 높이를 영상 전체 높이로 나눈 값을 .22 시작 기준과 비교한다. 같은 짧은 변 대비 얼굴 크기 .25가 9:16에서는 .140625로 작아져, 얼굴이 LOCK되어도 near=false / ATTRACT에 머문다. alwaysVisible=true는 캐릭터를 계속 보여 주지만 그 상태에서는 얼굴/팔 미믹이 차단된다. 사용자 현장 런타임을 직접 읽은 것은 아니며 사진과 일치하는 코드 경로를 합성 입력으로 재현한 것이다.
+- 수정: SignalProcessor의 접근 크기에 실제 videoWidth/videoHeight를 전달해 얼굴 높이/짧은 변으로 정규화한다. 가로 입력의 기존 수치와 기준은 유지한다. 얼굴 타깃/상반신 매칭 및 락온 박스는 기존 원본 좌표 그대로다. 시작/해제 기준 자체를 무조건 낮추거나 얼굴만 보이면 활성화하는 변경은 하지 않았다. 설정 UI에 단위도 명시했다.
+- npm run presence:check에서 가로16:9·4:3 / 정사각형 / 세로3:4·9:16의 진입, 중간거리 유지, 원거리 해제, 중앙 이탈, 얼굴 소실, 원본 타깃 좌표 보존을 확인했다. 이전 호출(비율 미전달)은 LOCK=true/present=true/near=false/ATTRACT로 재현. 기존 check-body-session, typecheck, build 통과.
+- dev/presence-aspect-lab.html의 같은 합성 얼굴·팔 신호를 실제 SignalProcessor→MimicStateMachine→mapSignal→Puuvilla에 전달했다. 이전은 ATTRACT로 팔/고개 반응 없이 서 있고, 수정은 MIMIC로 진입해 인사와 고개 회전을 렌더한다. codex-v37-presence-{before,after}.png 보존, 콘솔 오류0. 실사용 OBS/MediaPipe 추론을 확인한 자료는 아니다.
+- 이번 공개 배포의 즉시 오류 수정으로 개발/공개 **codex-20261020-123721** 반영. 공개 릴리스 codex-promoted-20261020-123721, 62개 복사 파일 해시 일치. v36와 current.before-codex-v37.txt 보존, Claude 소스/preview 미수정. 외부 config.build 확인. 카메라 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-123721 .
+- 남은 확인: 현장 OBS 입력에서 실제 얼굴·팔 반응. 저장된 사용자 접근 임계값이 별도로 높거나 Pose 초기화가 실패한 경우는 이 수정만으로 보장하지 않는다. 이번에 리그/웨이트/높이/미러 버튼은 변경하지 않았다.
