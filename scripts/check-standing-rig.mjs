@@ -38,6 +38,25 @@ for(const i of rig.torsoAnchors){
  assert.deepEqual(rig.corrective[i],[0,0,0],'shoulder fairing must not reshape the torso');
 }
 const {Vector3}=await import('three');
+const {roundedElbowCenter}=await import('../src/character/standingBend.ts');
+// Geometric invariants of the rounded elbow: arc length, continuous tangent,
+// exact straight rest, and a rigid distal segment. These detect shortening and
+// new hinge corners, rather than checking one preferred greeting angle.
+for(const bend of [0,.2,.48,1.2,2.4]){
+ const length=60,upper=new Vector3(0,1,0),fore=upper.clone().applyAxisAngle(new Vector3(0,0,1),bend);
+ const width=Math.min(length*.60,Math.max(length*.36,bend*length*.32));
+ const center=s=>roundedElbowCenter(s,length,upper,fore);
+ if(bend===0)assert.ok(center(60).distanceTo(upper.clone().multiplyScalar(60))<1e-10);
+ for(let s=length/2-width/2+.1;s<length/2+width/2-.1;s+=.2){
+  const tangent=center(s+.001).sub(center(s-.001)).multiplyScalar(500);
+  assert.ok(Math.abs(tangent.length()-1)<.012,'rounded elbow stretched its centerline');
+ }
+ for(const edge of [length/2-width/2,length/2+width/2]){
+  const a=center(edge).sub(center(edge-.01)).normalize(),b=center(edge+.01).sub(center(edge)).normalize();
+  assert.ok(a.angleTo(b)<.003,'rounded elbow introduced a tangent corner');
+ }
+ assert.ok(center(72).sub(center(60)).distanceTo(fore.clone().multiplyScalar(12))<1e-9,'distal hand segment changed shape');
+}
 const {standingUpperDirection}=await import('../src/character/standingArmPose.ts');
 for(const side of [1,-1]){
  const j=rig.joints[side>0?'L':'R'];

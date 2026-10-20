@@ -57,6 +57,40 @@ void pvAddDQ(mat4 m,float weight,vec4 reference,inout vec4 real,inout vec4 dual)
 vec3 pvArmRotate(vec3 p, vec3 axis, float a) {
   return p*cos(a)+cross(axis,p)*sin(a)+axis*dot(axis,p)*(1.0-cos(a));
 }
+// Integrate unit tangents to preserve limb length through a rounded elbow.
+// Upper arm and paw stay rigid outside this transition; the torso is untouched.
+void pvRoundedElbow(vec3 p,vec3 n,mat4 upperM,mat4 foreM,out vec3 bent,out vec3 bentNormal) {
+  int side=position.x>=0.0?0:1;
+  vec3 restAxis=uArmAxis[side],delta=p-uArmOrigin[side];
+  float distance=dot(delta,restAxis),len=uArmLength[side];
+  vec3 upper=normalize(mat3(upperM)*restAxis),fore=normalize(mat3(foreM)*restAxis);
+  vec3 hinge=cross(upper,fore);
+  float theta=acos(clamp(dot(upper,fore),-1.0,1.0));
+  bent=(upperM*vec4(p,1.0)).xyz;
+  bentNormal=normalize(mat3(upperM)*n);
+  if(theta<.00001||length(hinge)<.00001)return;
+  hinge=normalize(hinge);
+  float width=min(.60*len,max(.36*len,theta*.32*len)),start=.5*len-.5*width;
+  if(distance<=start)return;
+  float amount=min(distance-start,width);
+  vec3 center=(upperM*vec4(uArmOrigin[side],1.0)).xyz+upper*start;
+  float nodes[6]=float[6](.033765242898424,.169395306766868,.380690406958402,.619309593041598,.830604693233132,.966234757101576);
+  float weights[6]=float[6](.085662246189585,.180380786524069,.233956967286346,.233956967286346,.180380786524069,.085662246189585);
+  for(int k=0;k<6;k++){
+    float t=amount*nodes[k]/width;
+    center+=pvArmRotate(upper,hinge,theta*t*t*(3.0-2.0*t))*(amount*weights[k]);
+  }
+  center+=fore*max(0.0,distance-start-width);
+  float t=clamp((distance-start)/width,0.0,1.0);
+  vec3 radial=mat3(upperM)*(delta-restAxis*distance);
+  float angle=theta*t*t*(3.0-2.0*t);
+  radial=pvArmRotate(radial,hinge,angle);
+  bent=center+radial;
+  vec3 tangent=pvArmRotate(upper,hinge,angle);
+  vec3 nr=pvArmRotate(mat3(upperM)*n,hinge,angle);
+  vec3 derivative=cross(hinge,radial)*(theta*6.0*t*(1.0-t)/width);
+  bentNormal=normalize(nr-tangent*dot(derivative,nr)/max(.1,1.0+dot(tangent,derivative)));
+}
 void pvArmSurface(vec3 p, vec3 n, out vec3 deformed, out vec3 deformedNormal) {
   int side = position.x >= 0.0 ? 0 : 1;
   vec3 axis=uArmAxis[side], offset=p-uArmOrigin[side];
@@ -111,6 +145,15 @@ pvArmSurface(position, objectNormal, pawUnused, pawNormal);
 objectNormal=pawNormal;
 if(pawDQ){
   objectNormal=pvRotateQ(pawReal,objectNormal);
+  float bendWeight=smoothstep(.95,1.0,connectedArmWeights.x+connectedArmWeights.y);
+  if(bendWeight>0.0){
+    bool left=position.x>=0.0;
+    mat4 upperM=bindMatrixInverse*getBoneMatrix(left?4.0:6.0)*bindMatrix;
+    mat4 foreM=bindMatrixInverse*getBoneMatrix(left?5.0:7.0)*bindMatrix;
+    vec3 unused,bentNormal;
+    pvRoundedElbow(pawUnused,pawNormal,upperM,foreM,unused,bentNormal);
+    objectNormal=normalize(mix(objectNormal,bentNormal,bendWeight));
+  }
 }else{
 #include <skinnormal_vertex>
 }`)
@@ -120,6 +163,15 @@ pvArmSurface(transformed, normal, pawPosition, pawUnusedNormal);
 transformed=pawPosition;
 if(pawDQ){
   transformed=pvRotateQ(pawReal,transformed)+2.0*(pawReal.w*pawDual.xyz-pawDual.w*pawReal.xyz+cross(pawReal.xyz,pawDual.xyz));
+  float bendWeight=smoothstep(.95,1.0,connectedArmWeights.x+connectedArmWeights.y);
+  if(bendWeight>0.0){
+    bool left=position.x>=0.0;
+    mat4 upperM=bindMatrixInverse*getBoneMatrix(left?4.0:6.0)*bindMatrix;
+    mat4 foreM=bindMatrixInverse*getBoneMatrix(left?5.0:7.0)*bindMatrix;
+    vec3 bent,bentNormal;
+    pvRoundedElbow(pawPosition,normal,upperM,foreM,bent,bentNormal);
+    transformed=mix(transformed,bent,bendWeight);
+  }
   int socketSide=position.x>=0.0?0:1;
   transformed+=pvRotateQ(uSocketRotation[socketSide],connectedArmCorrective)*uSocketActivation[socketSide];
 }else{
@@ -134,6 +186,6 @@ vec3 socketNormal=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));
 normal=normalize(mix(normal,socketNormal,vSocketNormalBlend));
 `);
     };
-    material.customProgramCacheKey = () => cache + "-anchored-torso-v5";
+    material.customProgramCacheKey = () => cache + "-rounded-elbow-v6";
   }
 }

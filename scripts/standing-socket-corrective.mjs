@@ -2,7 +2,7 @@ import * as T from 'three';
 
 // Pose-space fairing of the connected shoulder cage. The source mesh and all
 // topology stay untouched; only a zero-at-rest corrective attribute is baked.
-export function socketCorrective(P, neighbors, weights, joints) {
+export function socketCorrective(P, neighbors, weights, joints, preview = false) {
  const v=a=>new T.Vector3(...a), smooth=(a,b,x)=>{const t=T.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
  const sides=[1,-1].map(side=>{
   const j=joints[side>0?'L':'R'],s=v(j.shoulder),e=v(j.elbow),axis=v(j.hand).sub(s),length=axis.length();axis.normalize();
@@ -45,7 +45,7 @@ export function socketCorrective(P, neighbors, weights, joints) {
    return p.clone().lerp(average.divideScalar(sum),relaxation*region[i]);
   });
  }
- const correction=fair.map((p,i)=>p.sub(posed[i]).toArray());
+ const correction=fair.map((p,i)=>p.clone().sub(posed[i]).toArray());
  console.log('Socket corrective maximum cm:',Math.max(...correction.map(p=>Math.hypot(...p))).toFixed(2));
- return correction;
+ return preview ? {posed:posed.map(p=>p.toArray()),fair:fair.map(p=>p.toArray()),correction} : correction;
 }
