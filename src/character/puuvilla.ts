@@ -1249,7 +1249,7 @@ export class PuuvillaCharacter implements CharacterRig {
       ? Math.min(this.cfg.character.freeArmRaiseMaxRad, theta)
       : Math.min(this.cfg.body.armRaiseMaxRad, arm.restPolar + (theta * (Math.PI - arm.restPolar)) / Math.PI);
     const d = this.connectedArms
-      ? standingUpperDirection(arm.side,arm.restUpper,tu,this.cfg.body.armRaiseMaxRad)
+      ? standingUpperDirection(arm.side,arm.restUpper,tu,this.cfg.body.armRaiseMaxRad,this.cfg.body.armContinuousAzimuth===true)
       : polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);
 
