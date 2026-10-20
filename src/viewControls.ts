@@ -44,6 +44,7 @@ export function setupViewControls(
   const cfg = full.scene;
   const btn = document.createElement("button");
   btn.id = "layoutToggle";
+  btn.classList.add("view-control");
   btn.setAttribute("aria-label", "가로/세로 화면 전환");
   btn.style.cssText =
     "position:fixed;left:12px;bottom:12px;z-index:30;width:40px;height:40px;border-radius:20px;border:0;padding:0;" +
@@ -260,6 +261,22 @@ export function setupViewControls(
     showOilPanel();
   });
   document.body.appendChild(oBtn);
+
+  // F toggles presentation controls independently of D's debug panel.
+  window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() !== "f" || e.repeat || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target;
+    if (target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest("input, textarea, select"))) return;
+    e.preventDefault();
+    const hidden = document.body.classList.toggle("controls-hidden");
+    if (hidden) {
+      panelOpen = false;
+      showOilPanel();
+      if (document.activeElement instanceof HTMLElement &&
+          document.activeElement.closest(".view-control")) document.activeElement.blur();
+    }
+  });
 
   // 오른쪽 아래: 의상 전환 (곰 = 기존 스카프, 산타 모자 = 크리스마스 목도리). 지금 입은 쪽이 진하게
   const outfitBtns: [HTMLButtonElement, "classic" | "christmas"][] = [];

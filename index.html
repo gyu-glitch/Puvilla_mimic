@@ -27,6 +27,7 @@
       /* 튜닝 패널이 오른쪽 아래 카메라/락온 영역 박스를 가리지 않게 */
       .lil-gui.root { max-height: calc(100vh - var(--camera-preview-height, min(42vw, 420px) * 9 / 16) - 36px); overflow-y: auto; }
       body.debug-hidden #cam, body.debug-hidden #camWrap, body.debug-hidden #stats, body.debug-hidden .lil-gui { display: none !important; }
+      body.controls-hidden .view-control, body.controls-hidden #oilPanel { display: none !important; }
     </style>
   </head>
   <body>

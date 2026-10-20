@@ -5,10 +5,13 @@
  */
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import { toRawFaces } from "./tracker";
+import { FaceRecovery } from "./faceRecovery";
 
 declare const self: DedicatedWorkerGlobalScope;
 let landmarker: FaceLandmarker | null = null;
 let transpose = false;
+const recovery = new FaceRecovery();
+let inputEpoch = -1;
 
 type InitMsg = {
   type: "init";
@@ -42,8 +45,13 @@ self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
     const t0 = performance.now();
     try {
       if (!landmarker) throw new Error("not ready");
-      const res = landmarker.detectForVideo(d.bitmap, d.ts);
-      const faces = toRawFaces(res, d.bitmap.width, d.bitmap.height, transpose);
+      if (inputEpoch !== d.epoch) { recovery.reset(); inputEpoch = d.epoch; }
+      const faces = recovery.run(d.bitmap, d.ts, (image, ts) => {
+        const res = landmarker!.detectForVideo(image, ts);
+        const width = "videoWidth" in image ? image.videoWidth : image.width;
+        const height = "videoHeight" in image ? image.videoHeight : image.height;
+        return toRawFaces(res, width, height, transpose);
+      });
       self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0, epoch: d.epoch });
     } catch (err) {
       self.postMessage({ type: "result", faces: null, inferenceMs: 0, msg: String(err), epoch: d.epoch });

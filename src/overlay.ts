@@ -239,6 +239,7 @@ export class Overlay {
     // 기본은 숨김 — d 키 또는 오른쪽 위 ⚙ 버튼(폰·태블릿)으로 열기
     const btn = document.createElement("button");
     btn.id = "overlayToggle";
+    btn.classList.add("view-control");
     btn.textContent = "⚙";
     btn.title = "튜닝 화면 열기/닫기 (d)";
     btn.style.cssText =

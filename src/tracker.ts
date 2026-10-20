@@ -3,6 +3,7 @@ import { isEmbedded, visionFileset } from "./embedded";
 import * as THREE from "three";
 import type { Config } from "./config";
 import { log } from "./logger";
+import { FaceRecovery } from "./faceRecovery";
 
 /** 한 얼굴에서 뽑은 raw 신호 (스무딩 전) */
 export interface RawFace {
@@ -48,6 +49,7 @@ export class FaceTracker {
   private resultTimes: number[] = [];
   private falling = false;
   private inputEpoch = 0;
+  private recovery = new FaceRecovery();
   /** 오버레이 표시용: "worker-GPU" / "main-GPU" 등 */
   mode = "";
   modelSource = "";
@@ -188,23 +190,26 @@ export class FaceTracker {
     if (!this.landmarker) return this.lastResult;
 
     const t0 = performance.now();
-    let res: FaceLandmarkerResult;
+    let faces: RawFace[];
     try {
-      res = this.landmarker.detectForVideo(input, nowMs);
+      faces = this.recovery.run(input, nowMs, (image, ts) => {
+        const res = this.landmarker!.detectForVideo(image, ts);
+        const width = "videoWidth" in image ? image.videoWidth : image.width;
+        const height = "videoHeight" in image ? image.videoHeight : image.height;
+        return toRawFaces(res, width, height, this.cfg.transposeMatrix);
+      });
     } catch (e) {
       log.error("tracker", `detectForVideo 실패: ${String(e)}`);
       return this.lastResult;
     }
     const inferenceMs = performance.now() - t0;
 
-    const width = "videoWidth" in input ? input.videoWidth : input.width;
-    const height = "videoHeight" in input ? input.videoHeight : input.height;
-    const faces = toRawFaces(res, width || 1, height || 1, this.cfg.transposeMatrix);
     this.lastResult = { faces, inferenceMs };
     return this.lastResult;
   }
 
   resetInput(): void {
+    this.recovery.reset();
     this.inputEpoch++;
     this.lastResult = { faces: [], inferenceMs: 0 };
     this.lastVideoTime = -1;

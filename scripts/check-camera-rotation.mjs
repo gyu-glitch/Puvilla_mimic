@@ -16,7 +16,7 @@ const image={width:640,height:360};
 let faceCalls=0,poseCalls=0;
 const face=new FaceTracker(cfg.tracker),pose=new PoseTracker(cfg.pose,'unused');
 face.landmarker={detectForVideo(input){assert.equal(input,image);faceCalls++;
- return {faceLandmarks:[],faceBlendshapes:[],facialTransformationMatrixes:[]};}};
+ return {faceLandmarks:[[{x:.4,y:.3,z:0},{x:.6,y:.6,z:0}]],faceBlendshapes:[],facialTransformationMatrixes:[]};}};
 const points=Array.from({length:33},()=>({x:.5,y:.5,z:0,visibility:1}));
 points[11].x=.4;points[12].x=.6;
 pose.cfg={...cfg.pose,everyNFrames:1};
