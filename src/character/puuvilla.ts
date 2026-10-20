@@ -194,6 +194,7 @@ export class PuuvillaCharacter implements CharacterRig {
   debugLegacyPalm = false;
   debugDisableFrontPaw = false;
   debugLegacyPawTwist = false;
+  debugLegacyFrontBoundary = false;
   /** Development comparison; null keeps the normal raised-paw roll. */
   debugPawTurn: number | null = null;
 
@@ -1148,7 +1149,7 @@ export class PuuvillaCharacter implements CharacterRig {
         let target = arm.side * (this.debugPawTurn ?? -Math.PI/2) * raised;
         if(this.cfg.body.armPawFrame && this.debugPawTurn===null && !this.debugDisableFrontPaw){
           const viewer=this.debugLegacyPalm?undefined:new THREE.Vector3(0,0,1).applyQuaternion(armFrame.clone().invert());
-          const front=standingFrontPawRoll(arm.restFore,arm.qUpper,arm.qFore,arm.side,target,viewer);
+          const front=standingFrontPawRoll(arm.restFore,arm.qUpper,arm.qFore,arm.side,target,viewer,!this.debugLegacyFrontBoundary);
           target+=Math.atan2(Math.sin(front-target),Math.cos(front-target))*raised;
         }
         let trackedRoll:number|null=null;

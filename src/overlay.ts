@@ -219,6 +219,7 @@ export class Overlay {
     f7.close();
 
     const f5 = this.gui.addFolder("카메라·트래커 (재시작 필요)");
+    f5.add(cfg.camera, "deviceLabelIncludes").name("카메라 이름 (빈칸=기본)");
     f5.add(cfg.camera, "mirror").name("거울 모드 (좌우 반전)");
     f5.add(cfg.tracker, "transposeMatrix").name("고개 축 뒤집힘 보정");
     f5.add(cfg.tracker, "delegate", ["GPU", "CPU"]).name("얼굴 추론 장치");

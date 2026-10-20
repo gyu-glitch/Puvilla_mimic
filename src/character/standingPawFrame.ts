@@ -38,10 +38,16 @@ export function standingPawRoll(
 /** Face the paw toward the viewer without inheriting a twist from the elbow's
  * swing plane. Near a camera-facing forearm this direction is indeterminate;
  * retain the ordinary fallback there instead of normalizing a tiny vector. */
-export function standingFrontPawRoll(rest:Vector3,upper:Quaternion,fore:Quaternion,side:1|-1,fallback:number,viewer=new Vector3(0,0,1)):number {
+export function standingFrontPawRoll(rest:Vector3,upper:Quaternion,fore:Quaternion,side:1|-1,fallback:number,viewer=new Vector3(0,0,1),blendBoundary=true):number {
  const direction=rest.clone().applyQuaternion(fore).applyQuaternion(upper);
  const across=direction.clone().cross(viewer).multiplyScalar(-side);
- if(across.lengthSq()<.10)return fallback;
+ const separation=across.lengthSq();
+ if(separation<=.10)return fallback;
  const offset=standingPawRoll(rest,upper,fore,fallback,direction,across);
- return offset===null?fallback:fallback+offset;
+ // The projected viewer axis becomes unreliable near the optical axis.
+ // Fade its correction in over 18–30 degrees instead of switching the
+ // whole correction on at 18 degrees (up to ~79 degrees in the fixture).
+ const x=Math.max(0,Math.min(1,(separation-.10)/.15));
+ const weight=blendBoundary?x*x*(3-2*x):1;
+ return offset===null?fallback:fallback+offset*weight;
 }
