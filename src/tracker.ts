@@ -3,7 +3,7 @@ import { isEmbedded, visionFileset } from "./embedded";
 import * as THREE from "three";
 import type { Config } from "./config";
 import { log } from "./logger";
-import { FaceRecovery } from "./faceRecovery";
+import { FaceRecovery, type FaceHint } from "./faceRecovery";
 
 /** 한 얼굴에서 뽑은 raw 신호 (스무딩 전) */
 export interface RawFace {
@@ -169,7 +169,7 @@ export class FaceTracker {
   }
 
   /** 매 렌더 프레임에 호출. 새 비디오 프레임일 때만 추론. */
-  update(video: HTMLVideoElement, nowMs: number, input: HTMLCanvasElement | HTMLVideoElement = video): TrackResult {
+  update(video: HTMLVideoElement, nowMs: number, input: HTMLCanvasElement | HTMLVideoElement = video, hint: FaceHint | null = null): TrackResult {
     if ((!this.landmarker && !this.worker) || video.readyState < 2) return this.lastResult;
     if (this.worker) this.checkWorkerSpeed(nowMs);
     if (this.worker && this.busy) return this.lastResult; // 앞 프레임 추론 중 — 렌더는 기다리지 않음
@@ -184,7 +184,7 @@ export class FaceTracker {
       const epoch = this.inputEpoch;
       this.busy = true;
       createImageBitmap(input).then(
-        (bitmap) => w.postMessage({ type: "frame", bitmap, ts: nowMs, epoch }, [bitmap]),
+        (bitmap) => w.postMessage({ type: "frame", bitmap, ts: nowMs, epoch, hint }, [bitmap]),
         () => (this.busy = false),
       );
       return this.lastResult;
@@ -199,7 +199,7 @@ export class FaceTracker {
         const width = "videoWidth" in image ? image.videoWidth : image.width;
         const height = "videoHeight" in image ? image.videoHeight : image.height;
         return toRawFaces(res, width, height, this.cfg.transposeMatrix);
-      });
+      }, hint);
     } catch (e) {
       log.error("tracker", `detectForVideo 실패: ${String(e)}`);
       return this.lastResult;

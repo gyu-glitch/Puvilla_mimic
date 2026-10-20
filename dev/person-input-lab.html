@@ -1,0 +1,71 @@
+<!doctype html><base href="/"><meta charset="utf-8"><title>사람 검출·고개 전달 확인</title>
+<style>body{background:#20242a;color:white;font:14px monospace}canvas{width:600px;max-width:95vw;border:1px solid #888}pre{white-space:pre-wrap}</style>
+<input type="file" id="fixture" accept="image/*"><button id="run">실제 사람 검출</button><button id="pipeline">전체 연결 검사</button>
+<pre id="status">파일 선택</pre><div id="results"></div>
+<script type="module">
+import {PoseTracker} from '/src/poseTracker.ts';
+import {loadConfig} from '/src/config.ts';
+import {FaceTracker} from '/src/tracker.ts';
+import {BodyTargetLock} from '/src/bodyTarget.ts';
+import {BodyProcessor} from '/src/body.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const status=document.querySelector('#status'),results=document.querySelector('#results'),file=document.querySelector('#fixture');
+document.querySelector('#run').onclick=async()=>{
+ try{
+ status.textContent='Pose 모델 초기화';results.replaceChildren();
+ const cfg=await loadConfig();cfg.pose.modelPath='/models/pose_landmarker_full.task';
+ const tracker=new PoseTracker(cfg.pose,'/mediapipe/wasm');await tracker.init();
+ const bitmap=await createImageBitmap(file.files[0]);
+ const rect=file.files[0].name.includes('7668')?[494,1082,300,150]:[520,965,350,165];
+ const canvas=document.createElement('canvas');canvas.width=rect[2];canvas.height=rect[3];
+ canvas.getContext('2d').drawImage(bitmap,...rect,0,0,canvas.width,canvas.height);bitmap.close();results.append(canvas);
+ const rows=[];let poses=[];
+ for(let i=0;i<30;i++){
+ const r=tracker.update({readyState:4,currentTime:i/30},performance.now(),canvas);poses=r.poses;
+ rows.push({poses:r.poses.length,inferenceMs:r.inferenceMs,people:r.poses.map(p=>({nose:p.nose,shoulderW:p.shoulderW,shoulders:[p.world[11].visibility,p.world[12].visibility],head:p.world[0].visibility}))});
+ await new Promise(r=>setTimeout(r,33));
+ }
+ const ctx=canvas.getContext('2d');ctx.fillStyle='lime';for(const p of poses)for(const v of p.image){ctx.beginPath();ctx.arc(v.x*canvas.width,v.y*canvas.height,1.3,0,Math.PI*2);ctx.fill();}
+ tracker.close();status.textContent=JSON.stringify({frames:rows.length,detected:rows.filter(r=>r.poses).length,first:rows[0],last:rows.at(-1)},null,2);
+ }catch(e){status.textContent=String(e);throw e;}
+};
+document.querySelector('#pipeline').onclick=async()=>{
+ try{
+ results.replaceChildren();status.textContent='전체 모델 초기화';
+ const bitmap=await createImageBitmap(file.files[0]);
+ const rect=file.files[0].name.includes('7668')?[494,1082,300,150]:[520,965,350,165];
+ const source=document.createElement('canvas');source.width=rect[2];source.height=rect[3];
+ source.getContext('2d').drawImage(bitmap,...rect,0,0,source.width,source.height);bitmap.close();
+ const blank=document.createElement('canvas');blank.width=source.width;blank.height=source.height;
+ blank.getContext('2d').fillRect(0,0,blank.width,blank.height);
+ const rows=[];
+ for(const worker of [false,true]){
+ const cfg=await loadConfig();cfg.pose.modelPath='/models/pose_landmarker_full.task';cfg.tracker.modelPath='/models/face_landmarker.task';cfg.tracker.wasmPath='/mediapipe/wasm';cfg.tracker.useWorker=worker;cfg.presence.lockZone={x:0,y:0,w:1,h:1};
+ const pt=new PoseTracker(cfg.pose,cfg.tracker.wasmPath),ft=new FaceTracker(cfg.tracker);await pt.init();await ft.init();
+ const lock=new BodyTargetLock(cfg),fsm=new MimicStateMachine(cfg);let signal=new SignalProcessor(cfg),body=new BodyProcessor(cfg);
+ let selectedFrames=0,faceFrames=0,mimic=0,firstPerson=null,firstFace=null,lastBox=null,lastHint=null,finalState=null,blankPresent=null,blankPerson=null,firstPitch=null,pitchRange=[];
+ const began=performance.now();
+ for(let i=0;i<230;i++){
+ const now=performance.now(),input=i<105?source:blank,video={readyState:4,currentTime:i/30};
+ const pr=pt.update(video,now,input),revision=lock.revision,selected=lock.update(pr.poses,signal.target,pr.fresh,now);
+ if(lock.revision!==revision){signal=new SignalProcessor(cfg);body=new BodyProcessor(cfg);ft.resetInput();}
+ const bp=body.update(selected,pr.fresh,now),hint=lock.headHint(now),tr=ft.update(video,now,input,hint);
+ const sig=signal.update(tr,now,source.width/source.height,hint),snap=fsm.update(sig,now,!!hint||!!bp);
+ if(i<105){
+ if(selected){selectedFrames++;if(firstPerson===null)firstPerson=i;}
+ if(sig.faceCount){faceFrames++;if(firstFace===null)firstFace=i;lastBox=signal.target;if(firstPitch===null)firstPitch=tr.faces[0]?.pitch;pitchRange.push(sig.pitch);}
+ if(snap.state==='MIMIC')mimic++;
+ if(hint)lastHint=hint;
+ }else{finalState=snap.state;blankPresent=sig.present;blankPerson=!!hint;}
+ await new Promise(r=>setTimeout(r,33));
+ }
+ rows.push({worker,mode:ft.mode,selectedFrames,faceFrames,mimic,firstPersonFrame:firstPerson,firstFaceFrame:firstFace,lastBox,lastHint,firstPitch,pitchRange:[Math.min(...pitchRange),Math.max(...pitchRange)],finalState,blankPresent,blankPerson});
+ const shown=document.createElement('canvas');shown.width=source.width;shown.height=source.height;const ctx=shown.getContext('2d');ctx.drawImage(source,0,0);
+ if(lastHint){const h=lastHint.size*shown.height;ctx.strokeStyle='cyan';ctx.strokeRect(lastHint.cx*shown.width-h/2,lastHint.cy*shown.height-h/2,h,h);}
+ if(lastBox){ctx.strokeStyle='lime';ctx.strokeRect((lastBox.cx-lastBox.h*shown.height/shown.width/2)*shown.width,(lastBox.cy-lastBox.h/2)*shown.height,lastBox.h*shown.height,lastBox.h*shown.height);}
+ results.append(shown);status.textContent=JSON.stringify(rows,null,2);ft.close();pt.close();
+ }
+ }catch(e){status.textContent=String(e);throw e;}
+};
+</script>

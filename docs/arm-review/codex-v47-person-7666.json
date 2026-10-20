@@ -1,0 +1,56 @@
+[
+  {
+    "worker": false,
+    "mode": "main-GPU",
+    "selectedFrames": 105,
+    "faceFrames": 105,
+    "mimic": 101,
+    "firstPerson": 0,
+    "firstFace": 0,
+    "lastBox": {
+      "cx": 0.5027370796274331,
+      "cy": 0.3216006285262533,
+      "h": 0.1740714004204809
+    },
+    "lastHint": {
+      "cx": 0.5041059851646423,
+      "cy": 0.346763014793396,
+      "size": 0.6336384256545764
+    },
+    "firstPitch": 20.124069026901076,
+    "pitchRange": [
+      0,
+      0
+    ],
+    "finalState": "IDLE",
+    "blankPresent": false,
+    "blankPerson": false
+  },
+  {
+    "worker": true,
+    "mode": "worker-GPU",
+    "selectedFrames": 105,
+    "faceFrames": 101,
+    "mimic": 99,
+    "firstPerson": 0,
+    "firstFace": 509,
+    "lastBox": {
+      "cx": 0.5027370796274331,
+      "cy": 0.3216006285262533,
+      "h": 0.1740714004204809
+    },
+    "lastHint": {
+      "cx": 0.5041059851646423,
+      "cy": 0.346763014793396,
+      "size": 0.6336384256545764
+    },
+    "firstPitch": 20.124069026901076,
+    "pitchRange": [
+      0,
+      0
+    ],
+    "finalState": "EXIT",
+    "blankPresent": false,
+    "blankPerson": false
+  }
+]

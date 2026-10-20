@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   const cameraInput = sim ? null : new CameraInput(video, cfg.camera);
   let signals = new SignalProcessor(cfg);
   let bodyProc = new BodyProcessor(cfg);
-  let bodyTarget = new BodyTargetLock();
+  let bodyTarget = new BodyTargetLock(cfg);
   let fsm = new MimicStateMachine(cfg);
   const scene = new Scene(document.getElementById("app")!, cfg.scene, cfg.character, cfg.filter);
   // 배경 (가운데 아래 버튼으로 주황 ↔ 겨울 마을) — 키오스크는 공용 설정 그대로 주황
@@ -217,24 +217,29 @@ async function main(): Promise<void> {
     if (cameraInput?.update()) {
       tracker?.resetInput(); poseTracker?.resetInput();
       signals = new SignalProcessor(cfg); bodyProc = new BodyProcessor(cfg);
-      bodyTarget = new BodyTargetLock(); fsm = new MimicStateMachine(cfg);
+      bodyTarget = new BodyTargetLock(cfg); fsm = new MimicStateMachine(cfg);
     }
     const input = cameraInput?.canvas ?? video;
-    const track = tracker ? tracker.update(video, now, input) : { faces: [], inferenceMs: 0 };
-    if (track.inferenceMs !== lastInferMs) {
-      inferFrames++;
-      lastInferMs = track.inferenceMs;
-    }
-    sig = sim ? sim.update(dt) : signals.update(track, now, cameraInput!.canvas.width / cameraInput!.canvas.height);
-
     let poseMs = 0;
     if (sim) body = sim.body(now / 1000);
     else if (poseTracker) {
       const pr = poseTracker.update(video, now, input);
       poseMs = pr.inferenceMs;
-      body = bodyProc.update(bodyTarget.update(pr.poses, signals.target, pr.fresh, now), pr.fresh, now);
+      const revision = bodyTarget.revision;
+      const selected = bodyTarget.update(pr.poses, signals.target, pr.fresh, now);
+      if (revision !== bodyTarget.revision) {
+        signals = new SignalProcessor(cfg); bodyProc = new BodyProcessor(cfg); tracker?.resetInput();
+      }
+      body = bodyProc.update(selected, pr.fresh, now);
     } else body = null;
-    snap = fsm.update(sig, now, body!==null);
+    const hint = bodyTarget.headHint(now);
+    const track = tracker ? tracker.update(video, now, input, hint) : { faces: [], inferenceMs: 0 };
+    if (track.inferenceMs !== lastInferMs) {
+      inferFrames++;
+      lastInferMs = track.inferenceMs;
+    }
+    sig = sim ? sim.update(dt) : signals.update(track, now, cameraInput!.canvas.width / cameraInput!.canvas.height, hint);
+    snap = fsm.update(sig, now, hint!==null || body!==null);
 
     const params = snap.state === "MIMIC" || snap.state === "ENTER" ? mapSignal(sig, cfg.mapping) : NEUTRAL_PARAMS;
     character.setState(snap);
@@ -253,7 +258,7 @@ async function main(): Promise<void> {
     }
     exprTest?.update(now);
     if (tracer) tracer(now, sig, snap.state, params, character, signals.debugFaces, exprTest?.label ?? null);
-    zoneEditor?.draw(signals.debugFaces);
+    zoneEditor?.draw([...signals.debugFaces, ...(!signals.debugFaces.some(f=>f.locked) ? bodyTarget.debugTarget(now) : [])]);
     overlay?.update({
       renderFps, inferFps, inferenceMs: track.inferenceMs, poseMs, body, mouthOpenFrom: cfg.mapping.mouthOpenGeoFrom,
       modelSource: `${quality.info} · ${tracker ? `${tracker.mode} · ${tracker.modelSource}` : "sim"}`, sig, snap,

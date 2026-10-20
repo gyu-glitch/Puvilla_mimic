@@ -1,14 +1,43 @@
 import { BodyProcessor } from "./body";
 import type { RawPose } from "./poseTracker";
+import type { Config } from "./config";
+import type { FaceHint } from "./faceRecovery";
+import type { ZoneFace } from "./lockZone";
 
-/** Continue the body already associated with a face while raised hands obscure
- * that face. A body alone cannot acquire a new visitor. */
+/** Direct mimic acquires the largest observed person in the operator's zone.
+ * Legacy distance mode retains face-led acquisition. */
 export class BodyTargetLock {
   private last: RawPose | null = null;
   private seen = -Infinity;
   private initialWidth = 0;
+  revision = 0;
+  constructor(private cfg?: Config) {}
+
+  private inZone(p: RawPose): boolean {
+    if (!this.cfg) return true;
+    const z = this.cfg.presence.lockZone, x = this.cfg.camera.mirror ? 1-p.nose.x : p.nose.x;
+    return x >= z.x && x <= z.x+z.w && p.nose.y >= z.y && p.nose.y <= z.y+z.h;
+  }
+
+  /** A geometric head search region, not a fabricated face detection. */
+  headHint(now: number): FaceHint | null {
+    if (!this.cfg?.presence.mimicOnLock || !this.last || now-this.seen >= this.cfg.presence.faceLostHoldMs) return null;
+    const p = this.last, aspect = p.imageAspect || 1;
+    const a = p.image?.[11], b = p.image?.[12];
+    const width = a && b ? Math.hypot((a.x-b.x)*aspect,a.y-b.y) : p.shoulderW*aspect;
+    return { cx:p.nose.x, cy:p.nose.y, size:width*1.8 };
+  }
+
+  debugTarget(now: number): ZoneFace[] {
+    const h = this.headHint(now);
+    if (!h) return [];
+    const w = h.size/(this.last!.imageAspect || 1);
+    return [{x:(this.cfg!.camera.mirror ? 1-h.cx : h.cx)-w/2,y:h.cy-h.size/2,w,h:h.size,
+      locked:false,inZone:true,body:true,held:now-this.seen>=250}];
+  }
 
   update(poses: RawPose[], face: {cx:number;cy:number;h:number} | null, fresh: boolean, now: number): RawPose | null {
+    if (this.cfg?.presence.mimicOnLock) return this.updatePerson(poses, fresh, now);
     if (!fresh) return now-this.seen<500 ? this.last : null;
     const usable = poses.filter(p => p.shoulderW>.03 && Number.isFinite(p.shoulderW) &&
       Number.isFinite(p.nose.x) && Number.isFinite(p.nose.y) &&
@@ -31,6 +60,36 @@ export class BodyTargetLock {
     }
     if (selected) { this.last=selected;this.seen=now; }
     else if (now-this.seen>=500) { this.last=null;this.initialWidth=0; }
+    return selected;
+  }
+
+  private updatePerson(poses: RawPose[], fresh: boolean, now: number): RawPose | null {
+    const hold = this.cfg!.presence.faceLostHoldMs;
+    if (now-this.seen >= hold && this.last) { this.last=null; this.revision++; }
+    if (!fresh) return now-this.seen<500 ? this.last : null;
+    // No fixed on-screen size threshold. Require actual, finite shoulder
+    // observations instead of accepting an undetected/degenerate skeleton.
+    const usable = poses.filter(p => Number.isFinite(p.shoulderW) && p.shoulderW>0 &&
+      Number.isFinite(p.nose.x) && Number.isFinite(p.nose.y) && this.inZone(p) &&
+      [11,12].every(i=>p.world[i]?.visibility>=.5 && p.image?.[i] &&
+        [p.world[i].x,p.world[i].y,p.world[i].z,p.image[i].x,p.image[i].y].every(Number.isFinite)) &&
+      Math.hypot(p.image![11].x-p.image![12].x,p.image![11].y-p.image![12].y)>0);
+    const width=(p:RawPose)=>Math.hypot((p.image![11].x-p.image![12].x)*(p.imageAspect || 1),p.image![11].y-p.image![12].y);
+    const center=(p:RawPose)=>({x:(p.image![11].x+p.image![12].x)/2,y:(p.image![11].y+p.image![12].y)/2});
+    let selected: RawPose | null = null;
+    if (this.last) {
+      const old=center(this.last), size=width(this.last), aspect=this.last.imageAspect || 1;
+      const candidates=usable.map(p=>({p,d:Math.hypot((center(p).x-old.x)*aspect,center(p).y-old.y),ratio:width(p)/size}))
+        .filter(c=>c.ratio>=.65 && c.ratio<=1.5 && c.d<Math.max(.04,size*.65))
+        .sort((a,b)=>a.d-b.d);
+      if (candidates.length===1 || candidates.length>1 && candidates[1].d-candidates[0].d>size*.2)
+        selected=candidates[0].p;
+      // While the original target is missing, do not hand the session to a bystander.
+    } else {
+      selected=usable.sort((a,b)=>width(b)-width(a))[0] ?? null;
+      if (selected) this.revision++;
+    }
+    if (selected) { this.last=selected; this.seen=now; }
     return selected;
   }
 }

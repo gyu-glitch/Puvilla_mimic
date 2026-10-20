@@ -316,7 +316,7 @@ export class Overlay {
       `얼굴      ${s.sig.faceCount}명  있음=${s.sig.present ? "O" : "X"}  가까움=${s.sig.near ? "O" : "X"}\n` +
       `          bboxH(얼굴 크기)=${s.sig.bboxH.toFixed(3)}  cx(가로 위치)=${s.sig.cx.toFixed(2)}\n` +
       `고개      좌우 ${s.sig.yaw.toFixed(1)}°  상하 ${s.sig.pitch.toFixed(1)}°  갸웃 ${s.sig.roll.toFixed(1)}°\n` +
-      `기준      ${!this.cfg.mapping.autoNeutral ? "자동 보정 꺼짐" : b.__neutralReady ? "고개·뜬 눈 기준 완료" : "화면 보고 눈 뜬 채 약 1초 정지"}\n` +
+      `기준      ${!this.cfg.mapping.autoNeutral ? "자동 보정 꺼짐" : b.__neutralReady ? "고개·뜬 눈 기준 완료" : "고개 추종 중 · 뜬 눈 기준 수집 중"}\n` +
       `상반신    ${body}\n` +
       // 입 판정 원값 — 다물었는데 'o' / 시무룩 안 됨 같은 문제는 이 줄로 확인
       `입        입술간격 ${(b.__dbgOpenRaw ?? 0).toFixed(3)} (무표정 ${(b.__dbgOpenBase ?? 0).toFixed(3)}, 'o' 기준 +${s.mouthOpenFrom.toFixed(2)})` +

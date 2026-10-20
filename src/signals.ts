@@ -4,6 +4,7 @@ import { OneEuro, OneEuroBank } from "./smoothing";
 import { log } from "./logger";
 import { FaceNeutral } from "./faceNeutral";
 import type { ZoneFace } from "./lockZone";
+import { faceMatchesHint, type FaceHint } from "./faceRecovery";
 
 export type Expression = "neutral" | "smile" | "surprise";
 
@@ -182,7 +183,8 @@ export class SignalProcessor {
     return this.lastTarget;
   }
 
-  update(track: TrackResult, nowMs: number, imageAspect = 1): FaceSignal {
+  update(track: TrackResult, nowMs: number, imageAspect = 1, hint: FaceHint | null = null): FaceSignal {
+    if (hint) track={...track,faces:track.faces.filter(f=>faceMatchesHint(f,hint,imageAspect))};
     const t = nowMs / 1000;
     const p = this.cfg.presence;
     const mirror = this.cfg.camera.mirror ? -1 : 1;
@@ -195,7 +197,20 @@ export class SignalProcessor {
     // Show a held outline when inference itself stalls, without extending lock.
     this.lastFaces = timely && age < 250 ? track.faces : [];
     const aspect = Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : 1;
-    const target = fresh && timely ? this.pickTarget(track.faces, nowMs, aspect) : null;
+    let target: RawFace | null = null;
+    if (fresh && timely && hint) {
+      // Body continuity has already selected the person. Do not apply a second
+      // stationary face-box gate that rejects a nod or a tilted face.
+      const candidates=track.faces.map(f=>({f,d:Math.hypot((f.bbox.cx-hint.cx)*aspect,f.bbox.cy-hint.cy)}))
+        .sort((a,b)=>a.d-b.d);
+      if (candidates.length===1 || candidates.length>1 && candidates[1].d-candidates[0].d>hint.size*.1)
+        target=candidates[0].f;
+      if (target) {
+        if (!this.lastTarget) this.resetFilters();
+        this.lastTarget={cx:target.bbox.cx,cy:target.bbox.cy,h:target.bbox.h};
+        this.lastTargetBox=target.bbox;this.lockMissSinceMs=0;
+      }
+    } else if (fresh && timely) target=this.pickTarget(track.faces,nowMs,aspect);
 
     if (target) {
       this.lastSeenMs = observedAt;

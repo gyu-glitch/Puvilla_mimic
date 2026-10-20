@@ -43,7 +43,7 @@ for(let now=30000;now<33000;now+=50){
 assert.equal(state.state,'IDLE');
 assert.equal(new BodyTargetLock().update([raw],null,true,0),null);
 const unowned=new MimicStateMachine(cfg);
-assert.equal(unowned.update(emptySignal(),1000,true).state,'IDLE');
+assert.equal(unowned.update(emptySignal(),1000,true).state,'ENTER','a selected person can now start mimic without face');
 // Modest confidence drift on a steady pose must not drop either arm.
 const stable=new BodyProcessor(cfg),oldStable=new Before(cfg);let oldRejected=0;
 for(let frame=0;frame<600;frame++){

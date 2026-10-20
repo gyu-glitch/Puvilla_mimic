@@ -3,6 +3,11 @@ import type { RawFace } from "./tracker";
 type Input = HTMLVideoElement | HTMLCanvasElement | ImageBitmap | OffscreenCanvas;
 type Crop = { x: number; y: number; size: number };
 type Detect = (input: Input, timestamp: number) => RawFace[];
+/** Original input coordinates; square side length relative to input height. */
+export type FaceHint = { cx: number; cy: number; size: number };
+export function faceMatchesHint(face: RawFace, hint: FaceHint, aspect: number): boolean {
+  return Math.hypot((face.bbox.cx-hint.cx)*aspect,face.bbox.cy-hint.cy)<hint.size*.45;
+}
 
 /** Fallback for small faces under strongly colored venue lighting.
  * Only inference is cropped/desaturated; the preview and pose input stay intact.
@@ -27,7 +32,7 @@ export class FaceRecovery {
     this.mode = "full";
   }
 
-  run(input: Input, now: number, detect: Detect): RawFace[] {
+  run(input: Input, now: number, detect: Detect, hint: FaceHint | null = null): RawFace[] {
     const width = "videoWidth" in input ? input.videoWidth : input.width;
     const height = "videoHeight" in input ? input.videoHeight : input.height;
     if (!width || !height) return [];
@@ -39,6 +44,22 @@ export class FaceRecovery {
       this.lastTimestamp = Math.max(now, this.lastTimestamp + 0.1);
       return detect(image, this.lastTimestamp);
     };
+    if (hint && [hint.cx,hint.cy,hint.size].every(Number.isFinite) && hint.size>0) {
+      const size=Math.min(width,height,hint.size*height);
+      let crop={x:Math.max(0,Math.min(width-size,hint.cx*width-size/2)),
+        y:Math.max(0,Math.min(height-size,hint.cy*height-size/2)),size};
+      const previous=this.crop;
+      if (previous && now-this.lastCropSeen<800 && size/previous.size>.8 && size/previous.size<1.25 &&
+          Math.hypot(hint.cx*width-previous.x-previous.size/2,hint.cy*height-previous.y-previous.size/2)<previous.size*.18)
+        crop=previous;
+      // Follow the selected person's head. Unrelated full-frame faces must not
+      // prevent an enlarged pass for this person, or steal its expression.
+      const faces=this.scan(input,crop,infer).filter(f=>faceMatchesHint(f,hint,width/height));
+      if (faces.length) {
+        this.crop=crop;this.lastCropSeen=now;this.mode="person";
+        return faces;
+      }
+    }
     let checkedFull = false;
     let fullFaces: RawFace[] = [];
     if (!this.crop || now - this.lastFull >= 1000) {

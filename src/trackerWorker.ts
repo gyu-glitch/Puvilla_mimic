@@ -5,7 +5,7 @@
  */
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import { toRawFaces } from "./tracker";
-import { FaceRecovery } from "./faceRecovery";
+import { FaceRecovery, type FaceHint } from "./faceRecovery";
 
 declare const self: DedicatedWorkerGlobalScope;
 let landmarker: FaceLandmarker | null = null;
@@ -21,7 +21,7 @@ type InitMsg = {
   transpose: boolean;
   options: Record<string, unknown>;
 };
-type FrameMsg = { type: "frame"; bitmap: ImageBitmap; ts: number; epoch: number };
+type FrameMsg = { type: "frame"; bitmap: ImageBitmap; ts: number; epoch: number; hint?: FaceHint | null };
 
 self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
   const d = e.data;
@@ -51,7 +51,7 @@ self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
         const width = "videoWidth" in image ? image.videoWidth : image.width;
         const height = "videoHeight" in image ? image.videoHeight : image.height;
         return toRawFaces(res, width, height, transpose);
-      });
+      }, d.hint);
       self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0, epoch: d.epoch, ts: d.ts });
     } catch (err) {
       self.postMessage({ type: "result", faces: null, inferenceMs: 0, msg: String(err), epoch: d.epoch });

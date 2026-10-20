@@ -46,9 +46,11 @@ globalThis.createImageBitmap=async input=>{
  assert.equal(input,image);return {width:640,height:360};
 };
 const wf=new FaceTracker({...cfg.tracker,useWorker:true});
-await wf.init();wf.update(video,200,image);
+const hint={cx:.5,cy:.3,size:.2};
+await wf.init();wf.update(video,200,image,hint);
 await Promise.resolve();
 assert.equal(submitted.epoch,0);
+assert.deepEqual(submitted.hint,hint,'worker must receive the selected head ROI in original input coordinates');
 wf.resetInput();
 worker.onmessage({data:{type:'result',epoch:0,faces:[{old:true}],inferenceMs:5,ts:200}});
 assert.deepEqual(wf.lastResult.faces,[],'late pre-rotation response must be discarded');

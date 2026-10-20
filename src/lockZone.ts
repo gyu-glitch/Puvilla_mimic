@@ -9,6 +9,7 @@ export interface ZoneFace {
   locked: boolean;
   inZone: boolean;
   held?: boolean;
+  body?: boolean;
 }
 
 type Mode = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | null;
@@ -250,14 +251,14 @@ export class LockZoneEditor {
 
     for (const f of faces) {
       g.lineWidth = f.locked ? 3 : 1.5;
-      g.strokeStyle = f.held ? "#ffba55" : f.locked ? "#3ee07a" : f.inZone ? "#ffffff" : "rgba(160,160,160,0.8)";
+      g.strokeStyle = f.held ? "#ffba55" : f.body ? "#56dcff" : f.locked ? "#3ee07a" : f.inZone ? "#ffffff" : "rgba(160,160,160,0.8)";
       g.setLineDash(f.held ? [4, 4] : []);
       g.strokeRect(f.x * W, f.y * H, f.w * W, f.h * H);
       g.setLineDash([]);
-      if (f.locked || f.held) {
-        g.fillStyle = f.held ? "#ffba55" : "#3ee07a";
+      if (f.locked || f.held || f.body) {
+        g.fillStyle = f.held ? "#ffba55" : f.body ? "#56dcff" : "#3ee07a";
         g.font = "bold 12px system-ui";
-        g.fillText(f.held ? "LOCK 유지 · 재검출 중" : "LOCK", f.x * W, f.y * H - 4);
+        g.fillText(f.body ? (f.held ? "사람 LOCK 유지" : "사람 LOCK · 얼굴 추적 중") : f.held ? "LOCK 유지 · 재검출 중" : "LOCK", f.x * W, f.y * H - 4);
       }
     }
 

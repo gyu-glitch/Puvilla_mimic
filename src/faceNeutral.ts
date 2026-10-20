@@ -1,18 +1,24 @@
 import type { RawFace } from "./tracker";
 
-/** Learn one stable, open-eyed viewing pose per visitor, then freeze it.
- * No ongoing pitch following: a deliberate nod must remain a nod. */
+/** Fix the first observed pitch as the visitor's camera reference immediately.
+ * Learn open eyes separately; neither calibration follows subsequent nods. */
 export class FaceNeutral {
   private samples: { t: number; pitch: number; left: number; right: number }[] = [];
   private previous: RawFace | null = null;
-  private base: { pitch: number; left: number; right: number } | null = null;
+  private pitchBase: number | null = null;
+  private base: { left: number; right: number } | null = null;
   get ready(): boolean { return this.base !== null; }
-  reset(): void { this.samples = []; this.previous = null; this.base = null; }
+  reset(): void { this.samples = []; this.previous = null; this.base = null; this.pitchBase = null; }
 
   update(face: RawFace, now: number): void {
-    if (this.base || face === this.previous) return;
+    if (face === this.previous) return;
     this.previous = face; // Cached worker results are not additional samples.
     const { pitch, yaw, roll, eyes } = face;
+    // A neutral camera angle is a reference, never permission to move.
+    // Eyes may never meet the calibration gate under venue lighting. Holding
+    // pitch at zero until then disabled nodding for the entire session.
+    if (this.pitchBase === null && Number.isFinite(pitch)) this.pitchBase = pitch;
+    if (this.base) return;
     if (![pitch, yaw, roll, eyes?.left, eyes?.right].every(Number.isFinite) ||
         Math.abs(yaw) > 25 || Math.abs(roll) > 18 ||
         eyes.left < .025 || eyes.right < .025) {
@@ -31,10 +37,12 @@ export class FaceNeutral {
     if (quantile("pitch", .9) - quantile("pitch", .1) > 5 ||
         quantile("left", .2) < quantile("left", .75) * .7 ||
         quantile("right", .2) < quantile("right", .75) * .7) return;
-    this.base = { pitch: quantile("pitch", .5), left: quantile("left", .75), right: quantile("right", .75) };
+    this.base = { left: quantile("left", .75), right: quantile("right", .75) };
   }
 
-  pitch(raw: number): number { return this.base ? raw - this.base.pitch : 0; }
+  pitch(raw: number): number {
+    return Number.isFinite(raw) && this.pitchBase !== null ? raw - this.pitchBase : 0;
+  }
   blink(ear: number, side: "left" | "right"): number {
     if (!this.base || !Number.isFinite(ear) || ear <= 0) return 0;
     return Math.min(1, Math.max(0, (this.base[side] - ear) / (this.base[side] * .55)));
