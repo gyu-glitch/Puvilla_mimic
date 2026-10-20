@@ -18,6 +18,7 @@ import { standingWaveMotion } from "../standingWave";
 import { standingUpperDirection } from "./standingArmPose";
 import { StandingTorsoContact } from "./standingTorsoClearance";
 import {separateStandingPaws} from './standingPawContact';
+import {StandingElbowPlane} from './standingElbowPlane';
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -285,6 +286,7 @@ export class PuuvillaCharacter implements CharacterRig {
   private cageSurface: StandingCageSurface | null = null;
   private pawTracking=[new StandingPawTracking(),new StandingPawTracking()];
   private torsoContact=[new StandingTorsoContact(),new StandingTorsoContact()];
+  private elbowPlanes=[new StandingElbowPlane(),new StandingElbowPlane()];
 
   private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null, standingRig: StandingRig | null = null) {
     this.connectedArms = standingRig !== null;
@@ -905,6 +907,7 @@ export class PuuvillaCharacter implements CharacterRig {
   /** Reset contact history before replaying a deterministic review sequence. */
   resetArmContact(): void {
     this.torsoContact.forEach(contact=>contact.reset());
+    this.elbowPlanes.forEach(plane=>plane.reset());
   }
 
   /** 성능 조절: 털 셸을 n 장만 그림 (뿌리~끝에 고르게 남김). 털 길이는 그대로, 층 간격만 넓어짐 */
@@ -1028,8 +1031,9 @@ export class PuuvillaCharacter implements CharacterRig {
         _qIdle.identity();
         _qIdleF.identity();
       }
+      if(!pose||conf<this.cfg.body.minVisibility)this.elbowPlanes[arm.side>0?0:1].reset();
       if (pose && conf >= this.cfg.body.minVisibility) {
-        this.solveArm(arm, pose, humanTorso, tu, tf);
+        this.solveArm(arm, pose, humanTorso, tu, tf, dtSec);
       } else if (arm.side < 0 && wave > 0) {
         // 손 흔들기: 오른팔(화면 왼쪽)을 들고 아래팔을 까딱
         if (this.armsFree) {
@@ -1252,7 +1256,7 @@ export class PuuvillaCharacter implements CharacterRig {
    * 사람의 차렷(팔 아래)이 곰의 기본 A자 팔에 대응하도록 '아래에서 벌어진 각'을 재매핑한다
    * (그대로 쓰면 팔을 내렸을 때 곰 팔이 배를 뚫고 들어감).
    */
-  private solveArm(arm: ArmRig, pose: BodyPose, humanTorso: THREE.Quaternion, outU: THREE.Quaternion, outF: THREE.Quaternion): void {
+  private solveArm(arm: ArmRig, pose: BodyPose, humanTorso: THREE.Quaternion, outU: THREE.Quaternion, outF: THREE.Quaternion, dtSec: number): void {
     const L = arm.side > 0;
     const s = vec(L ? pose.shoulderL : pose.shoulderR);
     const e = vec(L ? pose.elbowL : pose.elbowR);
@@ -1274,6 +1278,11 @@ export class PuuvillaCharacter implements CharacterRig {
       : polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);
 
+    if(this.connectedArms && this.cfg.body.armElbowPlane){
+      const stable=this.elbowPlanes[arm.side>0?0:1].direction(tu,tf,arm.side,this.cfg.body.elbowGain,dtSec);
+      stable.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(tu,d)).applyQuaternion(outU.clone().invert());
+      outF.setFromUnitVectors(arm.restFore,stable);return;
+    }
     // 팔꿈치: 사람의 굽힘각/굽힘축을 위팔 매핑과 같은 회전으로 옮김
     const bend = Math.min(2.4, tu.angleTo(tf) * this.cfg.body.elbowGain);
     _n.crossVectors(tu, tf);

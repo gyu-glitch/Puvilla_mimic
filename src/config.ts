@@ -274,6 +274,7 @@ export interface Config {
     armContinuousAzimuth?: boolean;
     armTorsoClearance?: boolean;
     armPawContact?: boolean;
+    armElbowPlane?: boolean;
   };
   scene: {
     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
@@ -575,6 +576,7 @@ export const DEFAULT_CONFIG: Config = {
     armContinuousAzimuth: true,
     armTorsoClearance: true,
     armPawContact: true,
+    armElbowPlane: true,
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,
