@@ -12,6 +12,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "response:check": "node --experimental-transform-types scripts/check-neutral-response.mjs",
+    "lowering:check": "node --experimental-transform-types scripts/check-arm-lowering.mjs",
     "camera:check": "node --experimental-transform-types scripts/check-camera-startup.mjs",
     "camera:rotation:check": "node --experimental-transform-types scripts/check-camera-rotation.mjs",
     "face:recovery:check": "node --experimental-transform-types scripts/check-face-recovery.mjs",

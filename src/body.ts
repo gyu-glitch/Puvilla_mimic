@@ -41,6 +41,7 @@ export class BodyProcessor {
   };
   private lastArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
   private confidentArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
+  private confidentArmImage: {L: number[] | null; R: number[] | null} = {L:null,R:null};
   private weakSince = {L: -Infinity, R: -Infinity};
 
   constructor(private cfg: Config) {
@@ -75,6 +76,7 @@ export class BodyProcessor {
     state.active = false; state.since = -Infinity; state.samples = 0;
     this.lastArmVectors[s]=null;
     this.confidentArmVectors[s]=null;
+    this.confidentArmImage[s]=null;
     this.weakSince[s]=-Infinity;
     for (const joint of ["elbow", "wrist", "handAcross", "handDirection"]) this.bank.resetPrefix(`${joint}${s}`);
   }
@@ -129,9 +131,21 @@ export class BodyProcessor {
       const previous=this.lastArmVectors[s],anchor=this.confidentArmVectors[s];
       const near=(reference:V3[]|null)=>reference!==null&&vectors.every((v,i)=>
         Math.hypot(...v.map((x,k)=>x-reference[i][k]))<=.06);
+      const im=raw.image,aspect=raw.imageAspect;
+      const width=im&&aspect&&im[11]&&im[12]
+        ? Math.hypot((im[12].x-im[11].x)*aspect,im[12].y-im[11].y):0;
+      // Shoulder-relative projected heights, scaled to a nominal 36 cm
+      // shoulder span: translation, portrait input and distance do not alter
+      // the downward-motion threshold. Missing image evidence cannot unlock it.
+      const heights=im&&width>.02&&ids.every(i=>im[i]&&Number.isFinite(im[i].y))
+        ? ids.slice(1).map(i=>(im[i].y-im[ids[0]].y)*.36/width):null;
+      const imageAnchor=this.confidentArmImage[s];
+      const lowering=state.active && near(previous) && anchor!==null && heights!==null && imageAnchor!==null &&
+        heights[1]>=imageAnchor[1]+.001 && heights[0]>=imageAnchor[0]-.005 &&
+        vectors.every((v,i)=>v[1]>=anchor[i][1]-.005);
       // Weak tracking may maintain a confirmed gesture, but must not gradually
       // walk away from it by accepting an unlimited series of small steps.
-      const continuous=state.active && near(previous) && near(anchor);
+      const continuous=state.active && near(previous) && (near(anchor)||lowering);
       // A steady raised arm should not drop merely because visibility drifts
       // below the acquisition threshold. Uncertain jumps still release it.
       const threshold = Math.max(this.cfg.body.minVisibility, continuous ? .5 : .65);
@@ -166,7 +180,12 @@ export class BodyProcessor {
       if (!state.active) armConfidence[s] = 0;
       else if(!held[s]) {
         this.lastArmVectors[s]=vectors;
-        if(armConfidence[s]>=Math.max(this.cfg.body.minVisibility,.65))this.confidentArmVectors[s]=vectors;
+        if(armConfidence[s]>=Math.max(this.cfg.body.minVisibility,.65)||lowering){
+          // A moderate-confidence anchor may advance only downward, never
+          // follow a weak upward drift. This lets slow lowering keep its pace.
+          this.confidentArmVectors[s]=vectors;
+          this.confidentArmImage[s]=heights;
+        }
       }
     }
     const t = nowMs / 1000;
