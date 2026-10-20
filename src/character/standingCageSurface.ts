@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {subdivide,toBufferGeometry,type PolyMesh} from './subdivide';
 import {subdivisionPlans} from './subdivisionPlan';
-import {roundedElbowCenter} from './standingBend';
+import {RoundedElbowFrame} from './standingBend';
 import type {StandingArmSurface} from './standingArmSurface';
 
 const smooth=(a:number,b:number,x:number)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
@@ -93,7 +93,7 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
       const bone=side===0?4:6,upper=axis.clone().transformDirection(this.matrices[bone]),fore=axis.clone().transformDirection(this.matrices[bone+1]);
       const hinge=upper.clone().cross(fore).normalize(),theta=upper.angleTo(fore),len=this.lengths[side];
       const width=Math.min(.60*len,Math.max(.36*len,theta*.32*len));
-      return {bone,upper,fore,hinge,theta,width,origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
+      return {bone,upper,fore,hinge,theta,width,frame:new RoundedElbowFrame(len,upper,fore),origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
     }):null;
     for(let i=0;i<this.part.positions.length;i++){
       p.fromArray(this.part.positions[i]);const side=p.x>=0?0:1,w=this.rig.weights[i],mask=Math.min(1,w[0]+w[1]);
@@ -121,7 +121,7 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
         const blend=smooth(.95,1,Math.min(mask,armInfluence));
         if(blend>0){
           const b=bends[side],distance=v.copy(local).sub(origin).dot(axis);
-          const center=roundedElbowCenter(distance,len,b.upper,b.fore).add(b.origin);
+          const center=b.frame.center(distance,sum).add(b.origin);
           v.addScaledVector(axis,-distance).applyQuaternion(this.real[b.bone]);
           v.applyAxisAngle(b.hinge,b.theta*smooth(.5*len-.5*b.width,.5*len+.5*b.width,distance));
           p.lerp(center.add(v),blend);

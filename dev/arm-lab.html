@@ -2,7 +2,7 @@
 <html lang="ko"><head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex 팔 리그 검증</title>
 <style>body{margin:0;font:14px system-ui;color:#fff}#app{position:fixed;inset:0}nav{position:fixed;z-index:3;left:12px;top:12px;right:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#17212de8;border-radius:12px}select,button{font:inherit;padding:6px}#status{position:fixed;z-index:3;bottom:12px;left:12px;white-space:pre-wrap;background:#17212de8;padding:12px;border-radius:10px}</style></head>
 <body><div id="app"></div><nav><strong>Codex · 원본 팔 검증</strong>
-<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="cross">가로지르기</option></select></label>
+<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="cross">가로지르기</option><option value="waist">허리 앞 손</option></select></label>
 <label>시점 <select id="view"><option value="0">정면</option><option value="45">45도</option><option value="90">측면</option><option value="180">뒤</option></select></label>
 <label>표현 <select id="look"><option value="surface">표면 확인</option><option value="fur">털 포함</option><option value="final">유화 포함</option></select></label>
 <label>범위 <select id="range"><option value="3">전체</option><option value="1.2">기존 제한</option></select></label>
@@ -51,7 +51,7 @@ if(new URLSearchParams(location.search).has('turn'))character.debugPawTurn=Numbe
 scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
 const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
 const qp=new URLSearchParams(location.search);
-const reviewTag=(qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
+const reviewTag=(qp.has('curve')?'codex-v12-curve':qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
 if(qp.get('source')==='1')document.querySelector('#record').disabled=true;
 let recordEpoch=null;
 document.querySelector('#hold').checked=qp.get('hold')==='1';
@@ -108,6 +108,7 @@ function pose(t){
   if(mode==='front'){theta=Math.PI/2;phi=Math.PI/2;}
   if(mode==='elbow'){theta=.25;bend=Number(qp.get('bend')??1.8);phi=.1;}
   if(mode==='cross'){theta=1.5;phi=Math.PI+Math.sin(t*3)*.03;bend=.2;}
+  if(mode==='waist'){theta=1.25;phi=.15;bend=-1.75+Math.sin(t*1.5)*.15;}
   if(mode==='wave'&&side<0){theta=Number(qp.get('raise')??2.18);phi=.08;bend=2.86-theta+Math.sin(t*2.5)*.08;}
   if(mode==='sweep'){theta=(Math.sin(t*.7+side*.4)+1)*1.4;bend=(Math.sin(t*1.1)+1)*.65;phi=(Math.sin(t*.4)+1)*.35;}
   const s=new THREE.Vector3(side*.18,.48,0);

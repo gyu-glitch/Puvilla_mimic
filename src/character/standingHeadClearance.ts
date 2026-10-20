@@ -1,5 +1,5 @@
 import {Quaternion,Vector3} from 'three';
-import {roundedElbowCenter} from './standingBend';
+import {RoundedElbowFrame} from './standingBend';
 
 const pivot=new Vector3(0,126,2);
 // Measured from the standing source head, excluding the ears. The inflated
@@ -9,9 +9,10 @@ const samples=[.5,.6,.7,.8,.9,1,1.1];
 
 export function standingHeadClearance(shoulder:Vector3,length:number,upper:Vector3,fore:Vector3,head:Quaternion){
   const inv=head.clone().invert(),c=center.clone().sub(pivot).applyQuaternion(head).add(pivot);
+  const curve=new RoundedElbowFrame(length,upper,fore),p=new Vector3();
   let distance=Infinity;const gradient=new Vector3();
   for(const t of samples){
-    const p=roundedElbowCenter(t*length,length,upper,fore).add(shoulder).sub(c).applyQuaternion(inv);
+    curve.center(t*length,p).add(shoulder).sub(c).applyQuaternion(inv);
     const rho=Math.hypot(p.x/radius.x,p.y/radius.y,p.z/radius.z);
     if(rho<distance){distance=rho;gradient.set(p.x/(radius.x*radius.x),p.y/(radius.y*radius.y),p.z/(radius.z*radius.z)).applyQuaternion(head).normalize();}
   }
