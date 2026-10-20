@@ -263,6 +263,9 @@ export interface Config {
     elbowGain: number;
     /** 곰 팔을 드는 최대 각(아래에서부터, rad). 너무 크면 어깨 메쉬가 찢어져 보임 */
     armRaiseMaxRad: number;
+    /** Standing model: topology-derived continuous skin, or legacy spatial weights for comparison. */
+    armRig: "legacy" | "connected";
+    armRigPath: string;
   };
   scene: {
     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
@@ -553,7 +556,9 @@ export const DEFAULT_CONFIG: Config = {
     torsoPitchClampDeg: 20,
     torsoRollClampDeg: 25,
     elbowGain: 1.0,
-    armRaiseMaxRad: 1.2,
+    armRaiseMaxRad: 3.0,
+    armRig: "connected",
+    armRigPath: "./models/stand_connected_rig.json",
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,

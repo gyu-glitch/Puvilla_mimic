@@ -16,7 +16,9 @@
     "build:single": "npm run build && node scripts/build-single.mjs",
     "serve": "node scripts/serve.mjs",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:preview": "node scripts/deploy.mjs"
+    "deploy:preview": "node scripts/deploy.mjs",
+    "rig:build": "node scripts/build-standing-rig.mjs",
+    "rig:check": "node --experimental-transform-types scripts/check-standing-rig.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",

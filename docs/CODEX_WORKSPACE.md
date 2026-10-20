@@ -1,5 +1,7 @@
 # Codex 작업 환경 — 2026-10-20
 
+최신 업데이트: Codex current.txt는 `codex-20261020-021858`(연결된 원본 메쉬 기반 팔 미믹 첫 검토본)을 가리킨다. 초기 공개 기준본은 별도 폴더에 그대로 보존했다. 상세 검증은 [ARM_MIMIC.md](ARM_MIMIC.md).
+
 ## 소유 범위
 
 사용자는 Claude와 Codex가 독립적으로 작업하기를 요청했다.
@@ -21,7 +23,7 @@
 - 소스는 기존 작업 디렉터리의 미커밋 변경을 포함한 파일 복사본이다. 기존 Git 이력, 임시 생성물(dev/tmp), 작업 실험(work), 로그는 복사하지 않았다. node_modules도 독립 파일 사본이다.
 - `work/stand/pu_stand.obj`와 `muffler_fit.bin`은 공개 빌드 `20261020-004619`에서 직접 복사했다. 같은 파일을 Codex public/models에도 적용했다.
 - 공개 배포본 49개 파일을 `../pubilla-mimic-codex-hosting/baseline-20261020-004619`에 보존했다. 모든 파일의 SHA-256 일치 확인.
-- Codex current.txt는 현재 이 보존 사본을 가리킨다. 소스 스냅샷 빌드와 공개 배포본이 동일하다는 뜻은 아니다.
+- 초기 Codex current.txt는 이 보존 사본을 가리켰다. 소스 스냅샷 빌드와 공개 배포본이 동일하다는 뜻은 아니다.
 - `npm run build` 타입 검사와 번들 빌드 통과. 로컬 config.json HTTP 200 및 공개 기준 빌드 ID 확인.
 - 공개 화면은 ?sim=1로 확인했다. 실카메라 추적 테스트는 하지 않았다.
 

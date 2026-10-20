@@ -53,6 +53,11 @@ async function main(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const kiosk = isKiosk();
   const sim = params.get("sim") === "1" ? new SimInput(cfg) : null;
+  if (sim && params.get("armdemo") === "1") {
+    cfg.body.enabled = true;
+    // Review-only framing so the hands stay visible; no settings are saved here.
+    Object.assign(cfg.scene, { viewCenterCm: 115, viewHeightCm: 210, pViewCenterCm: 115, pViewHeightCm: 250 });
+  }
   if (kiosk) await setupKiosk(cfg.kiosk);
 
   const video = document.getElementById("cam") as HTMLVideoElement;
@@ -216,7 +221,7 @@ async function main(): Promise<void> {
     else if (poseTracker) {
       const pr = poseTracker.update(video, now);
       poseMs = pr.inferenceMs;
-      body = bodyProc.update(BodyProcessor.pickForFace(pr.poses, signals.target), pr.fresh, now);
+      body = bodyProc.update(signals.target ? BodyProcessor.pickForFace(pr.poses, signals.target) : null, pr.fresh, now);
     } else body = null;
 
     const params = snap.state === "MIMIC" || snap.state === "ENTER" ? mapSignal(sig, cfg.mapping) : NEUTRAL_PARAMS;

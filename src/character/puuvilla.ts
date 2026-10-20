@@ -79,6 +79,7 @@ interface ArmRig {
 
 /** 팔 분리 케이지의 관절 (pu_stand_arm.json — scripts/stand_arm_split.py). 앱 cm */
 interface ArmJoints { R: { shoulder: number[]; elbow: number[]; hand: number[] }; L: { shoulder: number[]; elbow: number[]; hand: number[] } }
+interface StandingRig { version: number; body: string; rest: number[][]; weights: number[][]; joints: ArmJoints }
 
 /** Seat_A 리깅본 (public/models/seat.bin — dev/armsplit.html 이 만듦) */
 interface SeatBone { name: string; parent: number; pos: number[]; follow?: { bone: number; frac: number } }
@@ -216,7 +217,19 @@ export class PuuvillaCharacter implements CharacterRig {
       } catch { /* 없으면 ANATOMY 값 */ }
       log.info("character", `팔 분리 케이지: 관절 ${armJoints ? "파일" : "기본값"}`);
     }
-    const c = new PuuvillaCharacter(cfg, parts, sit, null, armJoints);
+    let standingRig: StandingRig | null = null;
+    if (!sit && !armJoints && cfg.body.armRig === "connected") {
+      const r = await fetch(cfg.body.armRigPath);
+      if (!r.ok) throw new Error(`Standing rig: HTTP ${r.status}`);
+      standingRig = await r.json() as StandingRig;
+      const body = parts.find(p => p.name === standingRig!.body);
+      if (standingRig.version !== 1 || !body || body.positions.length !== standingRig.rest.length ||
+          standingRig.weights.length !== body.positions.length ||
+          body.positions.some((p, i) => p.some((v, k) => Math.abs(v - standingRig!.rest[i][k]) > 0.0001))) {
+        throw new Error("Standing rig does not match the original body mesh");
+      }
+    }
+    const c = new PuuvillaCharacter(cfg, parts, sit, null, armJoints, standingRig);
     if (sit) {
       // 앉은 푸빌라: 목도리가 원래 그 몸에 맞게 만들어져 있어 맞추기 없이 그대로 (정점 색만 원본 텍스처에서)
       loadMuffler(cfg.character.sitMufflerPath)
@@ -256,8 +269,10 @@ export class PuuvillaCharacter implements CharacterRig {
   private armJoints: { side: 1 | -1; s: THREE.Vector3; e: THREE.Vector3; h: THREE.Vector3 }[] = [];
   /** 팔 부품 가늘게 하기: 정점마다 축 위 발(foot)과 반지름 벡터 (바인드 기준) — 들수록 radial 을 줄임 */
   private armSlim: { geo: THREE.BufferGeometry; side: 1 | -1; foot: Float32Array; radial: Float32Array; cur: number }[] = [];
+  private connectedArms = false;
 
-  private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null) {
+  private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null, standingRig: StandingRig | null = null) {
+    this.connectedArms = standingRig !== null;
     const ch = cfg.character, fc = cfg.face, fr = cfg.fur;
     const A = ANATOMY;
 
@@ -309,8 +324,9 @@ export class PuuvillaCharacter implements CharacterRig {
       const chest = mk(A.chest, A.spine);
       head = mk(A.head, A.chest);
       // 팔 관절: 팔 분리 케이지면 파일 값(회전 중심 = 어깨 고리 안쪽), 아니면 ANATOMY
-      const JL = armJointsFile ? { s: vec(armJointsFile.L.shoulder as V3), e: vec(armJointsFile.L.elbow as V3), h: vec(armJointsFile.L.hand as V3) } : { s: A.shoulderL.clone(), e: A.elbowL.clone(), h: A.handL.clone() };
-      const JR = armJointsFile ? { s: vec(armJointsFile.R.shoulder as V3), e: vec(armJointsFile.R.elbow as V3), h: vec(armJointsFile.R.hand as V3) } : { s: mirrorX(A.shoulderL), e: mirrorX(A.elbowL), h: mirrorX(A.handL) };
+      const jointSource = standingRig?.joints ?? armJointsFile;
+      const JL = jointSource ? { s: vec(jointSource.L.shoulder as V3), e: vec(jointSource.L.elbow as V3), h: vec(jointSource.L.hand as V3) } : { s: A.shoulderL.clone(), e: A.elbowL.clone(), h: A.handL.clone() };
+      const JR = jointSource ? { s: vec(jointSource.R.shoulder as V3), e: vec(jointSource.R.elbow as V3), h: vec(jointSource.R.hand as V3) } : { s: mirrorX(A.shoulderL), e: mirrorX(A.elbowL), h: mirrorX(A.handL) };
       this.armJoints = [{ side: 1, ...JL }, { side: -1, ...JR }];
       if (armJointsFile) {
         // 팔이 몸통과 떨어진 닫힌 부품 → 바인드(내린 팔) = 쉬는 자세, 인사·미믹은 자유 팔 로직
@@ -428,6 +444,13 @@ export class PuuvillaCharacter implements CharacterRig {
       }
       // 앉은 메쉬는 이미 촘촘한 삼각형 (세분화 안 함)
       const geo = toBufferGeometry(subdivide(part, this.sit ? 0 : ch.subdivLevels));
+      if (standingRig && part.name === standingRig.body) {
+        // Subdivide scalar weights with the exact same topology and UV expansion as the body.
+        // Position data, face indices and the original shoulder connection remain unchanged.
+        const wg = toBufferGeometry(subdivide({ ...part, positions: standingRig.weights }, ch.subdivLevels));
+        geo.setAttribute("connectedArmWeights", wg.getAttribute("position").clone());
+        wg.dispose();
+      }
 
       if (n.includes("eye") || n.includes("ryes") || n.includes("nose")) {
         // 강체: head 본의 자식. 지오메트리를 자기 중심으로 옮겨 깜빡임 스케일이 제자리에서 일어나게.
@@ -598,7 +621,8 @@ export class PuuvillaCharacter implements CharacterRig {
     const w = new Float32Array(8);
     const p = new THREE.Vector3();
     const order = [0, 1, 2, 3, 4, 5, 6, 7];
-    const armW = arms === true ? this.diffuseArmWeights(geo) : null;
+    const connected = geo.getAttribute("connectedArmWeights");
+    const armW = arms === true && !connected ? this.diffuseArmWeights(geo) : null;
     const armPart = arms === "arm";
 
     for (let i = 0; i < n; i++) {
@@ -609,6 +633,10 @@ export class PuuvillaCharacter implements CharacterRig {
       let wa = armW ? armW.w[i] * (1 - wh) : 0;
       let tArm = armW ? armW.t[i] : 0;
       let wf = wa * smooth(0.42, 0.62, tArm);
+      if (connected) {
+        wa = Math.min(1, Math.max(0, connected.getX(i) + connected.getY(i))) * (1 - wh);
+        wf = Math.min(wa, Math.max(0, connected.getZ(i)) * (1 - wh));
+      }
       if (armPart) {
         // 팔 부품: 어깨→손 축 위치 t 로 위팔/아래팔. 팔꿈치 ±25% 구간에 걸쳐 섞음 → 각진 꺾임 대신 봉제인형 팔처럼 둥근 곡선으로 굽음
         const J = this.armJoints.find((q) => q.side === side) ?? this.armJoints[0];
@@ -1121,6 +1149,7 @@ export class PuuvillaCharacter implements CharacterRig {
     const inv = humanTorso.clone().invert();
     const tu = e.clone().sub(s).normalize().applyQuaternion(inv); // 몸통 기준
     const tf = w.clone().sub(e).normalize().applyQuaternion(inv);
+    if (tu.lengthSq() < 0.5 || tf.lengthSq() < 0.5) { outU.identity(); outF.identity(); return; }
 
     const theta = Math.acos(clamp(-tu.y, 1));
     let phi = Math.atan2(tu.z, arm.side * tu.x);
@@ -1128,6 +1157,8 @@ export class PuuvillaCharacter implements CharacterRig {
     // 몸에 붙은 팔(원본 메쉬): 바인드가 가장 내린 자세라 [rest, π] 로 눌러 맞춤. 자유 팔: 사람 각 그대로
     const theta2 = this.armsFree
       ? Math.min(this.cfg.character.freeArmRaiseMaxRad, theta)
+      : this.connectedArms
+        ? Math.min(this.cfg.body.armRaiseMaxRad, theta + arm.restPolar * (1 - smooth(0, Math.PI / 2, theta)))
       : Math.min(this.cfg.body.armRaiseMaxRad, arm.restPolar + (theta * (Math.PI - arm.restPolar)) / Math.PI);
     const d = polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);

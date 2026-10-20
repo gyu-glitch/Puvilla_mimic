@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex 팔 리그 검증</title>
+<style>body{margin:0;font:14px system-ui;color:#fff}#app{position:fixed;inset:0}nav{position:fixed;z-index:3;left:12px;top:12px;right:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#17212de8;border-radius:12px}select,button{font:inherit;padding:6px}#status{position:fixed;z-index:3;bottom:12px;left:12px;white-space:pre-wrap;background:#17212de8;padding:12px;border-radius:10px}</style></head>
+<body><div id="app"></div><nav><strong>Codex · 원본 팔 검증</strong>
+<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="sweep">연속 움직임</option></select></label>
+<label>시점 <select id="view"><option value="0">정면</option><option value="45">45도</option><option value="90">측면</option><option value="180">뒤</option></select></label>
+<label>표현 <select id="look"><option value="surface">표면 확인</option><option value="fur">털 포함</option><option value="final">유화 포함</option></select></label>
+<label>범위 <select id="range"><option value="3">전체</option><option value="1.2">기존 제한</option></select></label>
+<button id="capture">PNG 저장</button>
+</nav><div id="status">로딩 중</div><script type="module">
+import * as THREE from 'three';
+import {loadConfig} from '/src/config.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {Scene} from '/src/scene.ts';
+const cfg=JSON.parse(JSON.stringify(await loadConfig()).replaceAll('./models/','/models/'));
+cfg.body.armRig=new URLSearchParams(location.search).get('rig')==='legacy'?'legacy':'connected';
+cfg.character.modelPath='/models/pu_stand.obj'; cfg.outfit.seatBody=false; cfg.outfit.sitBody=false;cfg.outfit.style='christmas';
+cfg.body.enabled=true;cfg.body.armRaiseMaxRad=3;cfg.character.idleBreathAmp=0;
+cfg.scene.layout='landscape';cfg.scene.viewCenterCm=103;cfg.scene.viewHeightCm=220;cfg.scene.aspect=1.35;cfg.scene.cameraTiltDeg=0;
+cfg.filter.enabled=false;cfg.filter.oil.enabled=false;
+cfg.scene.bgTop='#6b7680';cfg.scene.bgBottom='#48535e';
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+scene.renderer.setPixelRatio(1);
+const character=await PuuvillaCharacter.load(cfg);
+scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
+const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
+const qp=new URLSearchParams(location.search);
+for(const key of Object.keys(controls))if(qp.has(key))controls[key].value=qp.get(key);
+function applyControls(){
+ character.root.rotation.y=Number(controls.view.value)*Math.PI/180;
+ character.setShellCount(controls.look.value==='surface'?0:14);
+ cfg.filter.oil.enabled=controls.look.value==='final';cfg.body.armRaiseMaxRad=Number(controls.range.value);
+}
+Object.values(controls).forEach(el=>el.addEventListener('change',applyControls));applyControls();
+document.querySelector('#capture').addEventListener('click',async()=>{
+ scene.render();const src=scene.renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;
+ const ctx=out.getContext('2d'),bg=ctx.createLinearGradient(0,0,0,out.height);bg.addColorStop(0,cfg.scene.bgTop);bg.addColorStop(1,cfg.scene.bgBottom);
+ ctx.fillStyle=bg;ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(src,0,0);
+ ctx.fillStyle='white';ctx.font='18px system-ui';ctx.fillText(`Codex · ${cfg.body.armRig} · ${controls.pose.selectedOptions[0].textContent}`,24,36);
+ const name=`codex-arm-${cfg.body.armRig}-${controls.pose.value}`;
+ const response=await fetch('/__mimic/trace',{method:'POST',body:`IMG ${name} ${out.toDataURL('image/png')}`});
+ document.querySelector('#capture').textContent=response.ok?'PNG 기록 완료':'저장 실패';
+});
+function pose(t){
+ const result={hipL:[.1,0,0],hipR:[-.1,0,0],armL:1,armR:1,hips:1};
+ const mode=controls.pose.value;
+ for(const side of [-1,1]){
+  const name=side>0?'L':'R'; let theta=0,phi=0,bend=0;
+  if(mode==='side')theta=Math.PI/2;
+  if(mode==='up')theta=2.85;
+  if(mode==='front'){theta=Math.PI/2;phi=Math.PI/2;}
+  if(mode==='elbow'){theta=.25;bend=1.8;phi=.1;}
+  if(mode==='wave'&&side<0){theta=1.4;bend=1.5+Math.sin(t*4)*.2;}
+  if(mode==='sweep'){theta=(Math.sin(t*.7+side*.4)+1)*1.4;bend=(Math.sin(t*1.1)+1)*.65;phi=(Math.sin(t*.4)+1)*.35;}
+  const s=new THREE.Vector3(side*.18,.48,0);
+  const dir=new THREE.Vector3(side*Math.sin(theta)*Math.cos(phi),-Math.cos(theta),Math.sin(theta)*Math.sin(phi));
+  const e=s.clone().addScaledVector(dir,.27);
+  const axis=mode==='elbow'?new THREE.Vector3(-1,0,0):new THREE.Vector3(0,0,-side);
+  const fore=dir.clone().applyAxisAngle(axis,bend);
+  const w=e.clone().addScaledVector(fore,.25);
+  result['shoulder'+name]=s.toArray();result['elbow'+name]=e.toArray();result['wrist'+name]=w.toArray();
+ }
+ return result;
+}
+let last=performance.now(),frames=0,stamp=last;
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ character.setState({state:'MIMIC',elapsedMs:now,progress:1});character.apply(NEUTRAL_PARAMS,dt,now/1000,pose(now/1000));scene.render();frames++;
+ if(now-stamp>1000){document.querySelector('#status').textContent=`원본 pu_stand.obj · ${controls.pose.selectedOptions[0].textContent}\n${Math.round(frames*1000/(now-stamp))} fps · 손/어깨/겨드랑이 형태 비교`;frames=0;stamp=now;}
+ requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+</script></body></html>

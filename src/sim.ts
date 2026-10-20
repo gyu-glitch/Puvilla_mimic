@@ -20,6 +20,7 @@ export class SimInput {
   private present = true;
   private bodyOn = true;
   private level: Record<string, number> = {};
+  private armDemo = new URLSearchParams(location.search).get("armdemo") === "1";
 
   constructor(private cfg: Config) {
     window.addEventListener("keydown", (e) => {
@@ -68,6 +69,13 @@ export class SimInput {
       let thU = 0.15 + up * 2.3 + cheer * 2.75, phU = 0.1 + fwd * 1.4;
       thU = Math.min(2.95, thU + fwd * 1.35);
       let thF = thU, phF = phU;
+      if (this.armDemo) {
+        // Continuous independent shoulder and elbow inputs through the same live retargeter.
+        thU = (Math.sin(timeSec * 0.55 + side * 0.6) + 1) * 1.35;
+        phU = (Math.sin(timeSec * 0.3) + 1) * 0.35;
+        thF = Math.min(3.05, thU + (Math.sin(timeSec * 0.9 + side) + 1) * 0.55);
+        phF = phU;
+      }
       if (wave > 0) {
         thU = thU + (1.45 - thU) * wave;
         thF = thF + (2.7 - thF) * wave;

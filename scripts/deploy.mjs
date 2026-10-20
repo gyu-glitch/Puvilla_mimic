@@ -64,4 +64,4 @@ gz(out);
 writeFileSync(resolve(hosting, preview ? "preview.txt" : "current.txt"), stamp);
 
 
-console.log(`[codex deploy] ${stamp} → https://nau-gyuchan.tailc22fe0.ts.net:10000/`);
+console.log(`[codex deploy] ${stamp} → http://localhost:4175/ (external Funnel activation is separate)`);

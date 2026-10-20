@@ -13,6 +13,7 @@ const outFile = resolve(outDir, "pubilla-mimic.html");
 const EMBED = [
   "config.json",
   "models/pu_stand.obj",
+  "models/stand_connected_rig.json",
   "models/pu_sit.obj",
   "models/muffler_sit.bin",
   "models/muffler_fit.bin",

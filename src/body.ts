@@ -28,6 +28,7 @@ export class BodyProcessor {
   private bank: OneEuroBank;
   private lastSeenMs = -Infinity;
   private last: BodyPose | null = null;
+  private armSeen = { L: -Infinity, R: -Infinity };
 
   constructor(private cfg: Config) {
     const b = cfg.body;
@@ -63,17 +64,27 @@ export class BodyProcessor {
       if (nowMs - this.lastSeenMs >= this.cfg.body.lostHoldMs) {
         this.last = null;
         this.bank.reset();
+        this.armSeen = { L: -Infinity, R: -Infinity };
       }
       return this.last;
     }
     const mirror = this.cfg.camera.mirror;
     const w = raw.world;
+    const usable = (i: number) => w[i] && [w[i].x, w[i].y, w[i].z, w[i].visibility].every(Number.isFinite);
+    if (![LM.lShoulder, LM.rShoulder].every(usable) ||
+        Math.min(w[LM.lShoulder].visibility, w[LM.rShoulder].visibility) < this.cfg.body.minVisibility) {
+      return this.update(null, true, nowMs);
+    }
     // 거울: 사람의 왼쪽(이미지 오른쪽) → 캐릭터 화면 왼쪽 = 캐릭터의 R(-x)
-    const pick = (i: number): V3 => [mirror ? -w[i].x : w[i].x, -w[i].y, -w[i].z];
+    const pick = (i: number): V3 => usable(i) ? [mirror ? -w[i].x : w[i].x, -w[i].y, -w[i].z] : [0, 0, 0];
     const side = mirror
       ? { L: [LM.rShoulder, LM.rElbow, LM.rWrist, LM.rHip], R: [LM.lShoulder, LM.lElbow, LM.lWrist, LM.lHip] }
       : { L: [LM.lShoulder, LM.lElbow, LM.lWrist, LM.lHip], R: [LM.rShoulder, LM.rElbow, LM.rWrist, LM.rHip] };
-    const vis = (i: number) => w[i].visibility;
+    const vis = (i: number) => usable(i) ? w[i].visibility : 0;
+    const armConfidence = {
+      L: Math.min(...side.L.slice(0, 3).map(vis)),
+      R: Math.min(...side.R.slice(0, 3).map(vis)),
+    };
     const t = nowMs / 1000;
 
     const pts: Record<(typeof KEYS)[number], V3> = {
@@ -81,17 +92,29 @@ export class BodyProcessor {
       shoulderR: pick(side.R[0]), elbowR: pick(side.R[1]), wristR: pick(side.R[2]), hipR: pick(side.R[3]),
     };
     for (const k of KEYS) {
+      const armSide = k.endsWith("L") ? "L" : "R";
+      if ((k.startsWith("elbow") || k.startsWith("wrist")) && armConfidence[armSide] < this.cfg.body.minVisibility) continue;
       const p = pts[k];
       pts[k] = [this.bank.filter(`${k}x`, p[0], t), this.bank.filter(`${k}y`, p[1], t), this.bank.filter(`${k}z`, p[2], t)];
     }
-    const shouldersOk = Math.min(vis(LM.lShoulder), vis(LM.rShoulder));
-    if (shouldersOk < this.cfg.body.minVisibility) return nowMs - this.lastSeenMs < this.cfg.body.lostHoldMs ? this.last : null;
+    for (const s of ["L", "R"] as const) {
+      if (armConfidence[s] >= this.cfg.body.minVisibility) this.armSeen[s] = nowMs;
+      else if (this.last && nowMs - this.armSeen[s] < this.cfg.body.lostHoldMs) {
+        // A wrist briefly occluded by the body must not snap the entire arm to idle.
+        // Carry the last valid limb with the newly observed shoulder, without feeding bad points into the filters.
+        for (const joint of ["elbow", "wrist"] as const) {
+          const k = `${joint}${s}` as const, shoulder = `shoulder${s}` as const;
+          pts[k] = pts[shoulder].map((v, i) => v + this.last![k][i] - this.last![shoulder][i]) as V3;
+        }
+        armConfidence[s] = this.last[`arm${s}`];
+      }
+    }
 
     this.lastSeenMs = nowMs;
     this.last = {
       ...pts,
-      armL: Math.min(vis(side.L[1]), vis(side.L[2])),
-      armR: Math.min(vis(side.R[1]), vis(side.R[2])),
+      armL: armConfidence.L,
+      armR: armConfidence.R,
       hips: Math.min(vis(LM.lHip), vis(LM.rHip)),
     };
     return this.last;
