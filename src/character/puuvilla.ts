@@ -21,6 +21,7 @@ import { StandingTorsoContact } from "./standingTorsoClearance";
 import {separateStandingPaws} from './standingPawContact';
 import {StandingElbowPlane} from './standingElbowPlane';
 import {standingPawRoll,standingFrontPawRoll} from './standingPawFrame';
+import {stepStandingPawTwist} from './standingPawTwist';
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -192,6 +193,7 @@ export class PuuvillaCharacter implements CharacterRig {
   debugLegacyTorso = false;
   debugLegacyPalm = false;
   debugDisableFrontPaw = false;
+  debugLegacyPawTwist = false;
   /** Development comparison; null keeps the normal raised-paw roll. */
   debugPawTurn: number | null = null;
 
@@ -1204,7 +1206,9 @@ export class PuuvillaCharacter implements CharacterRig {
         const current = this.armSurface.turn.value.getComponent(i);
         const delta=this.cfg.body.armPawFrame?Math.atan2(Math.sin(target-current),Math.cos(target-current)):target-current;
         const turnStep=this.cfg.body.armPawFrame?clamp(delta*k,6*dtSec):delta*k;
-        this.armSurface.turn.value.setComponent(i, current + turnStep);
+        this.armSurface.turn.value.setComponent(i,
+          this.cfg.body.armPawFrame&&!this.debugLegacyPawTwist
+            ?stepStandingPawTwist(current,target,k,dtSec):current+turnStep);
         this.armSurface.wrist.value[i].lerp(wristTarget,k);
       }
       // 떼어 낸 팔 부품: 들수록 가늘게 (위팔 방향의 y 로 든 정도 — 내린 팔 ≈ -0.8, 다 든 팔 ≈ +0.6)

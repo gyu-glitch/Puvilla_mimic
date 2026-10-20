@@ -1,0 +1,20 @@
+{ processorError: 0, upperError: 0, foreError: 0, pawError: 0 }
+{
+  firstWinding: 13.916666666666666,
+  maxTurn: 7.328164781363508,
+  maxTurns: 1.166313648745941,
+  final: [ 5.904719979435931, -5.904719979435931 ]
+}
+{
+  "maxBeforeDegrees": 419.8729135485387,
+  "maxAfterDegrees": 176.4290872405421,
+  "restBeforeDegrees": [
+    359.99999999999994,
+    -359.99999999999994
+  ],
+  "restAfterDegrees": [
+    -1.776827879169882e-38,
+    1.776827879169882e-38
+  ],
+  "tenMinuteBothSignsAt15_30_60Hz": "pass"
+}

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';import {registerHooks} from 'node:module';
 registerHooks({resolve(s,c,next){if(s.startsWith('.')&&c.parentURL&&!/\.[a-z]+$/i.test(s)){const p=new URL(s+'.ts',c.parentURL);if(existsSync(p))return next(p.href,c);}return next(s,c);}});
-const T=await import('three');const {PuuvillaCharacter}=await import('../src/character/puuvilla.ts');
+const T=await import('three');
+const {stepStandingPawTwist}=await import('../src/character/standingPawTwist.ts');const {PuuvillaCharacter}=await import('../src/character/puuvilla.ts');
 const {StandingElbowPlane}=await import('../src/character/standingElbowPlane.ts');
 const {StandingTorsoContact}=await import('../src/character/standingTorsoClearance.ts');
 const {standingFrontPawRoll,standingPawRoll}=await import('../src/character/standingPawFrame.ts');
@@ -26,7 +27,7 @@ for(let frame=0;frame<1800;frame++){
  const front=standingFrontPawRoll(a.restFore,a.q,a.f,a.side,target);target+=Math.atan2(Math.sin(front-target),Math.cos(front-target))*raised;
  const name=a.side>0?'L':'R',human=new T.Vector3(...pose['wrist'+name]).sub(new T.Vector3(...pose['elbow'+name])).normalize(),across=new T.Vector3(...pose['handAcross'+name]);
  const roll=standingPawRoll(a.restFore,a.q,a.f,target,human,across);a.paw.update(frame%11<2?null:roll,null,t,1/60);target+=a.paw.roll*raised;
- const delta=Math.atan2(Math.sin(target-a.roll),Math.cos(target-a.roll));a.roll+=Math.max(-.1,Math.min(.1,delta*(1-Math.exp(-18/60))));
+ a.roll=stepStandingPawTwist(a.roll,target,1-Math.exp(-18/60),1/60);
  }
  const [a,b]=arms,au=a.restUpper.clone().applyQuaternion(a.q),bu=b.restUpper.clone().applyQuaternion(b.q),af=a.restFore.clone().applyQuaternion(a.f).applyQuaternion(a.q),bf=b.restFore.clone().applyQuaternion(b.f).applyQuaternion(b.q);
  upperError=Math.max(upperError,au.distanceTo(mirror(bu)));foreError=Math.max(foreError,af.distanceTo(mirror(bf)));pawError=Math.max(pawError,Math.abs(Math.atan2(Math.sin(a.roll+b.roll),Math.cos(a.roll+b.roll))));
