@@ -16,6 +16,7 @@
     "camera:check": "node --experimental-transform-types scripts/check-camera-startup.mjs",
     "camera:rotation:check": "node --experimental-transform-types scripts/check-camera-rotation.mjs",
     "face:recovery:check": "node --experimental-transform-types scripts/check-face-recovery.mjs",
+    "face:continuity:check": "node --experimental-transform-types scripts/check-face-continuity.mjs",
     "presence:check": "node --experimental-transform-types scripts/check-presence-aspect.mjs && node --experimental-transform-types scripts/check-face-lock.mjs",
     "kiosk:win": "scripts\\kiosk.cmd",
     "kiosk:mac": "sh scripts/kiosk.sh",

@@ -26,3 +26,4 @@ This directory is the Codex-owned copy. Claude continues in `C:/SSG_Christmas/pu
 - Preserve the face, scarf, fur, background, and filter baseline while developing the requested arm behavior. Do not change the vendor oil filter.
 - Official 3D guide: `../asset/PUUVILLA IP FINAL/1 GUIDE/Puuvilla Character Guidebook_0911_FINAL.pdf`, especially pages 24, 31–33 and 44–50. Read `docs/PUUVILLA_3D_GUIDE.md` for verified findings. Preserve source hand/arm proportions; do not reintroduce paw expansion, axial shortening or global shoulder scaling to hide rig problems.
 
+- The user's immediate v44 onsite report of near-secondly lock loss is corrected in v45 codex-20261020-143426: bounded retry of the successful recovery region and explicit held-lock display. Promoted with current.before-codex-v45.txt preserving v44; unrelated experiments remain development-only.

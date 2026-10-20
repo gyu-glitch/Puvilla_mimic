@@ -13,6 +13,7 @@ export class FaceRecovery {
   private nextTile = 0;
   private lastSearch = -Infinity;
   private lastFull = -Infinity;
+  private lastCropSeen = -Infinity;
   private lastTimestamp = -Infinity;
   private width = 0;
   private height = 0;
@@ -22,6 +23,7 @@ export class FaceRecovery {
     this.crop = null;
     this.nextTile = 0;
     this.lastSearch = this.lastFull = -Infinity;
+    this.lastCropSeen = -Infinity;
     this.mode = "full";
   }
 
@@ -51,13 +53,18 @@ export class FaceRecovery {
     if (this.crop) {
       const faces = this.scan(input, this.crop, infer);
       if (faces.length) {
-        // A full-frame face may be a bystander, not the recovered visitor.
-        // Leave target selection to SignalProcessor with both current results.
-        if (fullFaces.length && faces.every(f => fullFaces.some(g => sameFaceBox(f, g)))) {
-          this.crop = null; this.mode = "full";
-          return fullFaces;
-        }
+        this.lastCropSeen = now;
+        // Keep the proven inference framing. A single successful full-frame
+        // probe is not evidence that full-frame tracking will remain reliable.
+        // Switching every second also changes the head-pose reference.
         return [...faces, ...fullFaces.filter(f => !faces.some(g => sameFaceBox(f, g)))];
+      }
+      // Retry this region at the incoming cadence after a brief missed frame.
+      // Do not turn one miss into a center/left/right search taking 500–750ms.
+      // Only current detections are returned; this is not a cached face hold.
+      if (now - this.lastCropSeen < 800) {
+        this.mode = "recovery-wait";
+        return fullFaces;
       }
       this.crop = null;
       if (fullFaces.length) { this.mode = "full"; return fullFaces; }
@@ -75,7 +82,7 @@ export class FaceRecovery {
     const offset = [0.5, 0, 1][this.nextTile++ % 3];
     const crop = { x: (width - size) * offset, y: (height - size) * offset, size };
     const faces = this.scan(input, crop, infer);
-    if (faces.length) this.crop = crop;
+    if (faces.length) { this.crop = crop; this.lastCropSeen = now; }
     return faces;
   }
 

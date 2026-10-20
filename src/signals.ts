@@ -3,6 +3,7 @@ import type { RawFace, TrackResult } from "./tracker";
 import { OneEuro, OneEuroBank } from "./smoothing";
 import { log } from "./logger";
 import { FaceNeutral } from "./faceNeutral";
+import type { ZoneFace } from "./lockZone";
 
 export type Expression = "neutral" | "smile" | "surprise";
 
@@ -49,6 +50,7 @@ export class SignalProcessor {
   private lastSeenMs = -Infinity;
   private lockMissSinceMs = 0; // 락온 대상을 못 찾기 시작한 시각
   private lastFaces: RawFace[] = [];
+  private lastTargetBox: RawFace["bbox"] | null = null;
   private lastTarget: { cx: number; cy: number; h: number } | null = null;
   private exprCandidate: Expression = "neutral";
   private exprSinceMs = 0;
@@ -119,6 +121,7 @@ export class SignalProcessor {
       if (match) {
         this.lockMissSinceMs = 0;
         this.lastTarget = { cx: match.bbox.cx, cy: match.bbox.cy, h: match.bbox.h };
+        this.lastTargetBox = match.bbox;
         return match;
       }
       // 잠깐 놓친 동안은 다른 사람으로 바꾸지 않는다
@@ -148,20 +151,29 @@ export class SignalProcessor {
       this.resetFilters();
       log.info("signal", `lock on h=${pick.bbox.h.toFixed(2)} cx=${pick.bbox.cx.toFixed(2)} (후보 ${faces.filter((f) => this.inZone(f)).length}명)`);
       this.lastTarget = { cx: pick.bbox.cx, cy: pick.bbox.cy, h: pick.bbox.h };
+      this.lastTargetBox = pick.bbox;
       this.lockMissSinceMs = 0;
     }
     return pick;
   }
 
   /** 오버레이(락온 영역 편집기) 표시용: 화면 좌표(미러 반영)의 얼굴 박스 */
-  get debugFaces(): { x: number; y: number; w: number; h: number; locked: boolean; inZone: boolean }[] {
+  get debugFaces(): ZoneFace[] {
     const lt = this.lastTarget;
-    return this.lastFaces.map((f) => ({
+    const faces: ZoneFace[] = this.lastFaces.map((f) => ({
       x: this.cfg.camera.mirror ? 1 - f.bbox.x - f.bbox.w : f.bbox.x,
       y: f.bbox.y, w: f.bbox.w, h: f.bbox.h,
       locked: !!lt && Math.abs(f.bbox.cx - lt.cx) < 1e-6 && Math.abs(f.bbox.cy - lt.cy) < 1e-6,
       inZone: this.inZone(f),
     }));
+    const b = this.lastTargetBox;
+    if (lt && b && !faces.some(f => f.locked)) {
+      faces.push({
+        x: this.cfg.camera.mirror ? 1 - b.x - b.w : b.x,
+        y: b.y, w: b.w, h: b.h, locked: false, inZone: true, held: true,
+      });
+    }
+    return faces;
   }
 
   /** 현재 대상 얼굴 (카메라 원본 좌표, 미러 전). 상반신 Pose 를 같은 사람으로 고를 때 사용 */

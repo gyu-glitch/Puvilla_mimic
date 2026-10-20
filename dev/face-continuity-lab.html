@@ -1,0 +1,62 @@
+<!doctype html><base href="/"><meta charset="utf-8"><title>얼굴 락 연속성 확인</title>
+<style>body{background:#202630;color:white;font:16px system-ui;margin:24px}button{font:inherit;padding:8px}canvas{max-width:700px}pre{font-size:14px;white-space:pre-wrap}</style>
+<h2>현장 사진 + 1초마다 한 프레임 가림 / 실제 얼굴 모델</h2>
+<p>현장 원본 동영상이 아닌 사진 반복 검사. 얼굴 추론은 실제 MediaPipe GPU이며 입력 가림만 합성합니다.</p>
+<input id="fixture" type="file" accept="image/*"><button id="run">전후 검사</button>
+<button id="hold">유지 표시 확인</button><button id="release">소실 해제 확인</button><pre id="status">파일 선택 대기</pre><div id="results"></div>
+<script type="module">
+import {FaceLandmarker,FilesetResolver} from '@mediapipe/tasks-vision';
+import {toRawFaces} from '/src/tracker.ts';
+import {FaceRecovery} from '/src/faceRecovery.ts';
+import {FaceRecovery as Before} from '/dev/face-recovery-before-v45.ts';
+import {loadConfig} from '/src/config.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
+import {LockZoneEditor} from '/src/lockZone.ts';
+const cfg=await loadConfig();cfg.presence.lockZone={x:0,y:0,w:1,h:1};
+const status=document.querySelector('#status'),results=document.querySelector('#results');
+let signal=new SignalProcessor(cfg),now=100,zone;
+const fake={bbox:{x:.42,y:.2,w:.16,h:.3,cx:.5,cy:.35},yaw:0,pitch:0,roll:0,blend:{},eyes:{left:.2,right:.2},mouth:{open:.1,corner:0}};
+const preview=document.createElement('canvas');preview.width=640;preview.height=360;
+preview.getContext('2d').fillRect(0,0,640,360);
+zone=new LockZoneEditor(cfg,preview,true);
+signal.update({faces:[fake],inferenceMs:0},now);zone.draw(signal.debugFaces);
+document.querySelector('#hold').onclick=()=>{signal=new SignalProcessor(cfg);signal.update({faces:[fake],inferenceMs:0},100);signal.update({faces:[],inferenceMs:0},200);zone.draw(signal.debugFaces);};
+document.querySelector('#release').onclick=()=>{signal.update({faces:[],inferenceMs:0},5000);zone.draw(signal.debugFaces);};
+document.querySelector('#run').onclick=async()=>{
+ try{
+ status.textContent='모델 준비';const bitmap=await createImageBitmap(document.querySelector('#fixture').files[0]);
+ const original=document.createElement('canvas');original.width=350;original.height=165;
+ original.getContext('2d').drawImage(bitmap,520,965,350,165,0,0,350,165);bitmap.close();results.replaceChildren(original);
+ const source=document.createElement('canvas');source.width=350;source.height=165;const ctx=source.getContext('2d');
+ const rows=[];
+ for(const [name,Recovery] of [['이전',Before],['수정',FaceRecovery]]){
+ const model=await FaceLandmarker.createFromOptions(await FilesetResolver.forVisionTasks('/mediapipe/wasm'),{
+ baseOptions:{modelAssetPath:'/models/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:3,
+ minFaceDetectionConfidence:.35,minFacePresenceConfidence:.3,minTrackingConfidence:.3,
+ outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true});
+ const r=new Recovery(),s=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg);
+ let detected=0,held=0,present=0,unlocks=0,was=false,maxGap=0,lastGood=0,started=false,neutralResets=0,neutralWas=false;
+ for(let i=0;i<360;i++){
+ ctx.clearRect(0,0,350,165);
+ if(i<300&&(i<30||i%30!==0))ctx.drawImage(original,0,0);
+ else {ctx.fillStyle='black';ctx.fillRect(0,0,350,165);}
+ const t=i*1000/30;
+ const faces=r.run(source,t,(im,ts)=>toRawFaces(model.detectForVideo(im,ts),im.width,im.height,cfg.tracker.transposeMatrix));
+ const sig=s.update({faces,inferenceMs:0},t,350/165);fsm.update(sig,t);
+ if(i<300){
+ if(faces.length){if(started)maxGap=Math.max(maxGap,t-lastGood);started=true;lastGood=t;detected++;}
+ if(sig.present)present++;if(s.debugFaces.some(f=>f.held))held++;
+ if(was&&!s.target)unlocks++;was=!!s.target;
+ if(neutralWas&&!s.neutralReady)neutralResets++;neutralWas=s.neutralReady;
+ }
+ if(i%30===0)status.textContent=JSON.stringify(rows,null,2)+'\n'+name+' '+i+'/360';
+ zone.draw(s.debugFaces);
+ await new Promise(resolve=>setTimeout(resolve,10));
+ }
+ rows.push({name,frames:300,blankFrames:9,detected,present,held,unlocks,maxGapMs:Math.round(maxGap),neutralResets,departed:!s.target});
+ model.close();status.textContent=JSON.stringify(rows,null,2);
+ }
+ }catch(e){status.textContent=String(e);throw e;}
+};
+</script>

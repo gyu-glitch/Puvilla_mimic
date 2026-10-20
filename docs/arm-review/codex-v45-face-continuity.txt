@@ -1,0 +1,40 @@
+
+> pubilla-mimic-codex@0.1.0 face:continuity:check
+> node --experimental-transform-types scripts/check-face-continuity.mjs
+
+[14:36:07.203] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.208] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.210] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.211] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.213] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.214] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.216] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.218] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.221] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.222] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.223] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.224] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[14:36:07.225] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+┌─────────┬────┬───────┬────────┬──────┬─────────┐
+│ (index) │ hz │ fixed │ maxGap │ seen │ missing │
+├─────────┼────┼───────┼────────┼──────┼─────────┤
+│ 0       │ 6  │ false │ 833    │ 28   │ 44      │
+│ 1       │ 6  │ true  │ 333    │ 61   │ 11      │
+│ 2       │ 10 │ false │ 700    │ 54   │ 66      │
+│ 3       │ 10 │ true  │ 200    │ 109  │ 11      │
+│ 4       │ 15 │ false │ 600    │ 92   │ 88      │
+│ 5       │ 15 │ true  │ 133    │ 169  │ 11      │
+│ 6       │ 30 │ false │ 567    │ 184  │ 176     │
+│ 7       │ 30 │ true  │ 67     │ 349  │ 11      │
+└─────────┴────┴───────┴────────┴──────┴─────────┘
+PASS: recurring brief loss, next-frame recovery, sustained absence, intermittent full probe, honest held/reacquired UI
