@@ -1,3 +1,4 @@
+import { standingTorso } from "./standingTorso";
 import * as THREE from "three";
 import type { Config } from "../config";
 import type { State, StateSnapshot } from "../state";
@@ -70,7 +71,7 @@ const lerpTable = (tab: [number, number][], x: number) => {
 // 임시 객체
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _qi = new THREE.Quaternion();
 const _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _n = new THREE.Vector3();
-const _m = new THREE.Matrix4(), _e = new THREE.Euler(0, 0, 0, "YXZ");
+const _e = new THREE.Euler(0, 0, 0, "YXZ");
 const _qIdle = new THREE.Quaternion(), _qIdleF = new THREE.Quaternion();
 const ID = new THREE.Quaternion();
 const vec = (p: V3) => new THREE.Vector3(p[0], p[1], p[2]);
@@ -188,6 +189,7 @@ export class PuuvillaCharacter implements CharacterRig {
   debugWave = 0;
   /** Development comparison only; never enabled by production configuration. */
   debugLegacyArmFrame = false;
+  debugLegacyTorso = false;
   /** Development comparison; null keeps the normal raised-paw roll. */
   debugPawTurn: number | null = null;
 
@@ -1285,16 +1287,7 @@ export class PuuvillaCharacter implements CharacterRig {
 
   /** 사람 몸통 기저(오른→왼 어깨 = +x, 엉덩이→어깨 = +y) → 회전 */
   private solveTorso(pose: BodyPose, out: THREE.Quaternion): void {
-    const right = vec(pose.shoulderL).sub(vec(pose.shoulderR));
-    const up = new THREE.Vector3(0, 1, 0);
-    if (pose.hips >= this.cfg.body.minVisibility) {
-      up.copy(vec(pose.shoulderL).add(vec(pose.shoulderR)).multiplyScalar(0.5))
-        .sub(vec(pose.hipL).add(vec(pose.hipR)).multiplyScalar(0.5));
-    }
-    up.normalize();
-    right.addScaledVector(up, -right.dot(up)).normalize();
-    const fwd = new THREE.Vector3().crossVectors(right, up);
-    out.setFromRotationMatrix(_m.makeBasis(right, up, fwd));
+    standingTorso(pose,this.cfg.body.minVisibility,out,this.debugLegacyTorso);
   }
 
   /**

@@ -39,6 +39,7 @@ export class BodyProcessor {
     R: { active: false, since: -Infinity, samples: 0 },
   };
   private lastArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
+  private weakSince = {L: -Infinity, R: -Infinity};
 
   constructor(private cfg: Config) {
     const b = cfg.body;
@@ -71,6 +72,7 @@ export class BodyProcessor {
     const state = this.armState[s];
     state.active = false; state.since = -Infinity; state.samples = 0;
     this.lastArmVectors[s]=null;
+    this.weakSince[s]=-Infinity;
     for (const joint of ["elbow", "wrist", "handAcross", "handDirection"]) this.bank.resetPrefix(`${joint}${s}`);
   }
 
@@ -116,6 +118,7 @@ export class BodyProcessor {
       L: Math.min(...side.L.slice(0, 3).map(vis)),
       R: Math.min(...side.R.slice(0, 3).map(vis)),
     };
+    const held = {L:false,R:false};
     for (const s of ["L", "R"] as const) {
       const state = this.armState[s], ids = side[s].slice(0, 3);
       const vectors=ids.slice(1).map(i=>usable(i)&&usable(ids[0])
@@ -135,16 +138,27 @@ export class BodyProcessor {
       // Reject collapsed/exploded inference, without limiting a valid arm's direction or lift.
       const plausible = upper >= .10 && upper <= .65 && fore >= .10 && fore <= .65 &&
         upper / fore >= .35 && upper / fore <= 2.5;
-      if (armConfidence[s] < threshold || !inFrame || !plausible) this.loseArm(s);
+      if (armConfidence[s] < threshold || !inFrame || !plausible) {
+        // A brief visibility dip at an unchanged, in-frame pose must not start
+        // a lower/reacquire cycle. Freeze the last accepted pose, never the
+        // uncertain sample. Persistent uncertainty still returns to rest.
+        const softDip=state.active && continuous && inFrame && plausible &&
+          armConfidence[s]>=.35 && this.last;
+        if(softDip && !Number.isFinite(this.weakSince[s]))this.weakSince[s]=nowMs;
+        if(softDip && nowMs-this.weakSince[s]<120){
+          held[s]=true;armConfidence[s]=this.last![s==="L"?"armL":"armR"];
+        }else this.loseArm(s);
+      }
       else if (!state.active) {
+        this.weakSince[s]=-Infinity;
         if (!Number.isFinite(state.since) || nowMs - this.lastSeenMs > 240) {
           state.since = nowMs; state.samples = 0;
         }
         state.samples++;
         state.active = nowMs - state.since >= 180 && state.samples >= 3;
-      }
+      }else this.weakSince[s]=-Infinity;
       if (!state.active) armConfidence[s] = 0;
-      else this.lastArmVectors[s]=vectors;
+      else if(!held[s]) this.lastArmVectors[s]=vectors;
     }
     const t = nowMs / 1000;
 
@@ -154,7 +168,7 @@ export class BodyProcessor {
     };
     const handFrames: {L?:Quaternion;R?:Quaternion}={};
     for (const s of ["L","R"] as const) {
-      if (armConfidence[s]===0) continue;
+      if (armConfidence[s]===0 || held[s]) continue;
       const aligned=alignedCameraArm(raw,side[s],mirror);
       if (!aligned) continue;
       const shoulder=new Vector3(...pts[`shoulder${s}`]),elbow=new Vector3(...pts[`elbow${s}`]);
@@ -167,12 +181,13 @@ export class BodyProcessor {
     }
     for (const k of KEYS) {
       const armSide = k.endsWith("L") ? "L" : "R";
+      if ((k.startsWith("elbow") || k.startsWith("wrist")) && held[armSide]) continue;
       if ((k.startsWith("elbow") || k.startsWith("wrist")) && armConfidence[armSide] < this.cfg.body.minVisibility) continue;
       const p = pts[k];
       pts[k] = [this.bank.filter(`${k}x`, p[0], t), this.bank.filter(`${k}y`, p[1], t), this.bank.filter(`${k}z`, p[2], t)];
     }
     for (const s of ["L", "R"] as const) {
-      if (armConfidence[s] === 0) {
+      if (armConfidence[s] === 0 || held[s]) {
         // Keep finite coordinates for consumers, but never promote a stale arm to valid.
         // The character eases this arm to its original rest pose.
         for (const joint of ["elbow", "wrist"] as const) {
@@ -187,6 +202,11 @@ export class BodyProcessor {
     this.lastSeenMs = nowMs;
     const hands: Pick<BodyPose,'handAcrossL'|'handAcrossR'|'handDirectionL'|'handDirectionR'> = {};
     for(const s of ['L','R'] as const){
+      if(held[s]){
+        hands[`handAcross${s}`]=this.last?.[`handAcross${s}`];
+        hands[`handDirection${s}`]=this.last?.[`handDirection${s}`];
+        continue;
+      }
       // MediaPipe Pose: left pinky/index 17/19, right pinky/index 18/20.
       const right = side[s][0] === LM.rShoulder;
       const pinky=right?18:17, index=right?20:19;
