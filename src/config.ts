@@ -270,6 +270,8 @@ export interface Config {
     armPawRollStart?: number;
     /** Development candidate; disabled unless explicitly selected. */
     armDistributedTwist?: boolean;
+    /** Cage bend distribution; .32 is the original narrow curve. */
+    armBendSpread?: number;
     armPawFrame?: boolean;
     armFollowPose?: boolean;
     armDeform?: 'surface' | 'cage';

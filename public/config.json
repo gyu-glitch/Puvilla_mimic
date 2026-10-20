@@ -176,6 +176,7 @@
     "armRig": "connected",
     "armRigPath": "./models/stand_connected_cage_mirrorleft.json",
     "armDeform": "cage",
+    "armBendSpread": 0.45,
     "armHeadClearance": false,
     "armHeadContact": false,
     "armUpperClearance": false,

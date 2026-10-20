@@ -13,9 +13,12 @@ export class RoundedElbowFrame {
  private tangent:Vector3;
  private end:Vector3;
  private straight:boolean;
- constructor(readonly length:number,private upper:Vector3,private fore:Vector3){
+ constructor(readonly length:number,private upper:Vector3,private fore:Vector3,spread=.32){
   this.theta=upper.angleTo(fore);
-  this.width=Math.min(length*.60,Math.max(length*.36,this.theta*length*.32));
+  // Stop before the rigid paw (s >= .84L). The wider option reduces the
+  // inner elbow's longitudinal compression without changing section radii.
+  const cap=Math.min(.66,.60+Math.max(0,spread-.32)*(.06/.13));
+  this.width=Math.min(length*cap,Math.max(length*.36,this.theta*length*spread));
   this.start=length*.5-this.width*.5;
   const axis=new Vector3().crossVectors(upper,fore);
   this.straight=this.theta<1e-6||axis.lengthSq()<1e-10;

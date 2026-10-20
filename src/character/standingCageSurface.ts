@@ -32,7 +32,7 @@ export class StandingCageSurface {
   evaluationCount=0;
   lastMilliseconds=0;
   private shoulderMetric:StandingShoulderMetric|null;
-  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true,metric=false,private rollStart=.30,private distributedTwist=false){
+  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true,metric=false,private rollStart=.30,private distributedTwist=false,private bendSpread=.32){
     this.shoulderMetric=metric?new StandingShoulderMetric(part.positions,part.faces,rig.weights):null;
     this.plans=subdivisionPlans(part,levels);
     this.points=new Float64Array(part.positions.length*3);
@@ -96,8 +96,8 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
     const bends=this.rounded && this.matrices.length>=8 ? this.axes.map((axis,side)=>{
       const bone=side===0?4:6,upper=axis.clone().transformDirection(this.matrices[bone]),fore=axis.clone().transformDirection(this.matrices[bone+1]);
       const hinge=upper.clone().cross(fore).normalize(),theta=upper.angleTo(fore),len=this.lengths[side];
-      const width=Math.min(.60*len,Math.max(.36*len,theta*.32*len));
-      return {bone,upper,fore,hinge,theta,width,frame:new RoundedElbowFrame(len,upper,fore),origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
+      const frame=new RoundedElbowFrame(len,upper,fore,this.bendSpread),width=frame.width;
+      return {bone,upper,fore,hinge,theta,width,frame,origin:this.origin[side].clone().applyMatrix4(this.matrices[bone])};
     }):null;
     for(let i=0;i<this.part.positions.length;i++){
       p.fromArray(this.part.positions[i]);const side=p.x>=0?0:1,w=this.rig.weights[i],mask=Math.min(1,w[0]+w[1]);
