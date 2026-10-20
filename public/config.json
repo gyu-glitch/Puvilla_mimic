@@ -176,7 +176,8 @@
     "armRig": "connected",
     "armRigPath": "./models/stand_connected_cage_rig.json",
     "armDeform": "cage",
-    "armHeadClearance": true
+    "armHeadClearance": true,
+    "armPawHold": true
   },
   "scene": {
     "bgTop": "#F76A4B",

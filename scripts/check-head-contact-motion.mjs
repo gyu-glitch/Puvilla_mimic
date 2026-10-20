@@ -25,4 +25,3 @@ function run(contact){
 }
 const targetOnly=run(false),contact=run(true);console.log({targetOnly,contact});
 assert.ok(contact.minimum>=targetOnly.minimum);assert.ok(contact.maxStep<.12);
-
