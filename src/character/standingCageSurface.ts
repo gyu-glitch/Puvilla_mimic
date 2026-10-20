@@ -26,6 +26,8 @@ export class StandingCageSurface {
   private real:THREE.Quaternion[]=[];
   private dual:THREE.Quaternion[]=[];
   private ready={value:0};
+  private previousState:number[]=[];
+  evaluationCount=0;
   lastMilliseconds=0;
   constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true){
     this.plans=subdivisionPlans(part,levels);
@@ -37,6 +39,11 @@ export class StandingCageSurface {
     this.mapping=(ids.getAttribute('position').array as Float32Array).slice();ids.dispose();
     const aw=geo.getAttribute('connectedArmWeights'),co=geo.getAttribute('connectedArmCorrective');
     this.active=Uint8Array.from({length:aw.count},(_,i)=>+(aw.getX(i)+aw.getY(i)>1e-7 || Math.hypot(co.getX(i),co.getY(i),co.getZ(i))>1e-7));
+    // Only faces incident to an overridden vertex contribute a used normal.
+    // Keep their original order so the summed normals remain bit-identical.
+    const activeVertices=new Set<number>();
+    this.active.forEach((active,i)=>{if(active)activeVertices.add(this.mapping[i*3]);});
+    this.faces=fine.faces.filter(face=>face.some(v=>activeVertices.has(v)));
     this.data=new Float32Array(1024*Math.ceil(aw.count*2/1024)*4);
     this.texture=new THREE.DataTexture(this.data,1024,this.data.length/4096,THREE.RGBAFormat,THREE.FloatType);
     this.texture.needsUpdate=true;
@@ -45,7 +52,7 @@ export class StandingCageSurface {
     this.lengths=this.axes.map(a=>a.length());this.axes.forEach(a=>a.normalize());
     geo.addEventListener('dispose',()=>{this.texture.dispose();skin.dispose();});
   }
-  bind(mesh:THREE.SkinnedMesh){this.mesh=mesh;}
+  bind(mesh:THREE.SkinnedMesh){this.mesh=mesh;this.previousState=[];}
   attach(material:THREE.Material){
     const compile=material.onBeforeCompile,cache=material.customProgramCacheKey();
     material.onBeforeCompile=(shader,renderer)=>{
@@ -75,6 +82,11 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
       const e=m.elements,d=this.dual[i]??=new THREE.Quaternion();d.set(e[12],e[13],e[14],0).multiply(q);
       d.set(d.x*.5,d.y*.5,d.z*.5,d.w*.5);
     }
+    const state=this.matrices.flatMap(m=>m.elements).concat(this.surface.turn.value.toArray(),this.surface.socketActivation.value.toArray(),this.surface.wrist.value.flatMap(v=>v.toArray()),this.surface.correctiveRotation.value.flatMap(q=>q.toArray()));
+    if(state.length===this.previousState.length && state.every((v,i)=>Number.isFinite(v)&&Math.abs(v-this.previousState[i])<1e-9)){
+      this.lastMilliseconds=performance.now()-start;return;
+    }
+    this.previousState=state;this.evaluationCount++;
     const si=this.skin.getAttribute('skinIndex'),sw=this.skin.getAttribute('skinWeight');
     const p=new THREE.Vector3(),v=new THREE.Vector3(),sum=new THREE.Vector3(),local=new THREE.Vector3(),qr=new THREE.Quaternion(),qd=new THREE.Quaternion(),rot=new THREE.Quaternion(),trans=new THREE.Quaternion();
     const bends=this.rounded && this.matrices.length>=8 ? this.axes.map((axis,side)=>{

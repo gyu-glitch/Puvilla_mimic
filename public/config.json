@@ -175,7 +175,8 @@
     "armRaiseMaxRad": 3,
     "armRig": "connected",
     "armRigPath": "./models/stand_connected_cage_rig.json",
-    "armDeform": "cage"
+    "armDeform": "cage",
+    "armHeadClearance": true
   },
   "scene": {
     "bgTop": "#F76A4B",

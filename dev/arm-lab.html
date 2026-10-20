@@ -2,7 +2,7 @@
 <html lang="ko"><head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex 팔 리그 검증</title>
 <style>body{margin:0;font:14px system-ui;color:#fff}#app{position:fixed;inset:0}nav{position:fixed;z-index:3;left:12px;top:12px;right:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#17212de8;border-radius:12px}select,button{font:inherit;padding:6px}#status{position:fixed;z-index:3;bottom:12px;left:12px;white-space:pre-wrap;background:#17212de8;padding:12px;border-radius:10px}</style></head>
 <body><div id="app"></div><nav><strong>Codex · 원본 팔 검증</strong>
-<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option></select></label>
+<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option></select></label>
 <label>시점 <select id="view"><option value="0">정면</option><option value="45">45도</option><option value="90">측면</option><option value="180">뒤</option></select></label>
 <label>표현 <select id="look"><option value="surface">표면 확인</option><option value="fur">털 포함</option><option value="final">유화 포함</option></select></label>
 <label>범위 <select id="range"><option value="3">전체</option><option value="1.2">기존 제한</option></select></label>
@@ -22,6 +22,8 @@ cfg.body.armRig=new URLSearchParams(location.search).get('rig')==='legacy'?'lega
 cfg.body.armDeform='surface';cfg.body.armRigPath='/models/stand_connected_rig.json';
 if(new URLSearchParams(location.search).get('deform')==='cage'){cfg.body.armDeform='cage';cfg.body.armRigPath='/models/stand_connected_cage_rig.json';}
 if(new URLSearchParams(location.search).get('elbow')==='dq')cfg.body.armCageRounded=false;
+cfg.body.armHeadClearance=['1','target'].includes(new URLSearchParams(location.search).get('clearance'));
+cfg.body.armHeadContact=new URLSearchParams(location.search).get('clearance')!=='target';
 if(new URLSearchParams(location.search).get('weights')==='sections')cfg.body.armRigPath='/models/stand_connected_rig_sections.json';
 if(new URLSearchParams(location.search).get('weights')==='portrait')cfg.body.armRigPath='/models/stand_connected_rig_portrait.json';
 const socketTest=new URLSearchParams(location.search).get('socket');
@@ -47,7 +49,7 @@ if(new URLSearchParams(location.search).has('turn'))character.debugPawTurn=Numbe
 scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
 const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
 const qp=new URLSearchParams(location.search);
-const reviewTag=qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7';
+const reviewTag=(qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
 if(qp.get('source')==='1')document.querySelector('#record').disabled=true;
 let recordEpoch=null;
 document.querySelector('#hold').checked=qp.get('hold')==='1';
@@ -82,7 +84,7 @@ document.querySelector('#record').addEventListener('click',()=>{
   const response=await fetch('/__mimic/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})});
   button.textContent=response.ok?'영상 기록 완료':'영상 저장 실패';button.disabled=false;
  };
- const duration=controls.pose.value==='greet'?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
+ const duration=['greet','sweep','nearhead'].includes(controls.pose.value)?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
  setTimeout(()=>{recorder.start();setTimeout(()=>recorder.stop(),duration);},700);
 });
 function pose(t){
@@ -96,6 +98,7 @@ function pose(t){
  const mode=controls.pose.value;
  for(const side of [-1,1]){
   const name=side>0?'L':'R'; let theta=0,phi=0,bend=0;
+  if(mode==='nearhead'){theta=2.65;bend=1.05;phi=.2;}
   if(mode==='side')theta=Math.PI/2;
   if(mode==='up')theta=2.85;
   if(mode==='front'){theta=Math.PI/2;phi=Math.PI/2;}
@@ -107,6 +110,7 @@ function pose(t){
   const e=s.clone().addScaledVector(dir,.27);
   const axis=mode==='elbow'?new THREE.Vector3(-1,0,0):new THREE.Vector3(0,0,side);
   const fore=dir.clone().applyAxisAngle(axis,bend);
+  if(mode==='nearhead')fore.set(side*Math.sin(3.7)*Math.cos(phi),-Math.cos(3.7),Math.sin(3.7)*Math.sin(phi));
   const w=e.clone().addScaledVector(fore,.25);
   result['shoulder'+name]=s.toArray();result['elbow'+name]=e.toArray();result['wrist'+name]=w.toArray();
  }
@@ -115,7 +119,15 @@ function pose(t){
 let last=performance.now(),frames=0,stamp=last;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
  const poseTime=recordEpoch===null?now/1000:Math.max(0,(now-recordEpoch)/1000);
- character.setState({state:'MIMIC',elapsedMs:now,progress:1});if(qp.get('source')!=='1')character.apply(NEUTRAL_PARAMS,dt,now/1000,pose(document.querySelector('#hold').checked?0:poseTime));scene.render();frames++;
+ const t=document.querySelector('#hold').checked?Number(qp.get('time')??0):poseTime;
+ const input=pose(t),face={...NEUTRAL_PARAMS};
+ if(qp.has('head')){face.headYaw=.6*Math.sin(t*.9);face.headPitch=.25*Math.sin(t*.7);face.headRoll=.2*Math.sin(t*1.3);}
+ if(qp.get('head')==='fast'){face.headYaw=.65*Math.sin(t*4);face.headPitch=.3*Math.sin(t*3);face.headRoll=.2*Math.sin(t*5);}
+ if(qp.has('torso')){
+  const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(.15*Math.sin(t*.7),.5*Math.sin(t*.8),.2*Math.sin(t*1.1),'YXZ'));
+  for(const [key,value] of Object.entries(input))if(Array.isArray(value)&&value.length===3)input[key]=new THREE.Vector3(...value).applyQuaternion(q).toArray();
+ }
+ character.setState({state:'MIMIC',elapsedMs:now,progress:1});if(qp.get('source')!=='1')character.apply(face,dt,now/1000,input);scene.render();frames++;
  if(now-stamp>1000){document.querySelector('#status').textContent=`${qp.get('source')==='1'?'정지 원본/실험':qp.get('deform')==='cage'?'실시간 · 케이지 변형 후 세분화':'연결 원본 · 실시간 변형'} · ${controls.pose.selectedOptions[0].textContent}\n${Math.round(frames*1000/(now-stamp))} fps · 손/어깨/겨드랑이 형태 비교`;frames=0;stamp=now;}
  requestAnimationFrame(frame);
 }requestAnimationFrame(frame);

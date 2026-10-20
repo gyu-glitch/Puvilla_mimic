@@ -268,6 +268,8 @@ export interface Config {
     armRigPath: string;
     armDeform?: 'surface' | 'cage';
     armCageRounded?: boolean;
+    armHeadClearance?: boolean;
+    armHeadContact?: boolean;
   };
   scene: {
     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
@@ -564,6 +566,7 @@ export const DEFAULT_CONFIG: Config = {
     armRig: "connected",
     armRigPath: "./models/stand_connected_cage_rig.json",
     armDeform: 'cage',
+    armHeadClearance: true,
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,

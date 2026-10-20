@@ -46,7 +46,9 @@ const original=cage.data.slice();
 root.position.set(3,4,5);root.rotation.set(.2,.7,-.3);root.scale.setScalar(.01);root.updateMatrixWorld(true);cage.update();
 let transformError=0;original.forEach((v,i)=>transformError=Math.max(transformError,Math.abs(v-cage.data[i])));
 assert.ok(transformError<2e-5,`parent transform leaked ${transformError}`);
+const count=cage.evaluationCount;cage.update();assert.equal(cage.evaluationCount,count,'unchanged pose was reevaluated');
 b.rotation.z=.8;cage.update();assert.ok(cage.data.every(Number.isFinite));
+assert.equal(cage.evaluationCount,count+1,'changed pose was cached');
 console.log({active,maxPosition,maxNormal,transformError,cpuMilliseconds:cage.lastMilliseconds});
 
 // Exercise the rounded-elbow path with its actual eight-bone indices. Distal
@@ -79,4 +81,29 @@ for(const angle of [.3,1.2,2.2]){
  assert.ok(error<.003,`paw changed size at bend ${angle}: ${error}cm`);
 }
 console.log('Rounded cage: large bend/roll finite, distal paw distances preserved.');
+const posedReference=toBufferGeometry(subdivide({...part,positions:part.positions.map((_,i)=>Array.from(cage.points.slice(i*3,i*3+3)))},2));
+for(let i=0;i<pos.count;i++)if(cage.active[i])for(let k=0;k<3;k++){
+ assert.ok(Math.abs(cage.data[i*8+k]-posedReference.getAttribute('position').array[i*3+k])<2e-5);
+ assert.ok(Math.abs(cage.data[i*8+4+k]-posedReference.getAttribute('normal').array[i*3+k])<2e-6,'partial normal pass differs from full posed surface');
+}
+posedReference.dispose();
+for(const change of [
+ ()=>surface.turn.value.set(.2,0),
+ ()=>surface.wrist.value[0].set(0,0,.1),
+ ()=>surface.socketActivation.value.set(.5,0),
+ ()=>surface.correctiveRotation.value[0].setFromAxisAngle(new T.Vector3(0,1,0),.2),
+]){
+ const before=cage.data.slice(),revision=cage.evaluationCount;change();cage.update();
+ assert.equal(cage.evaluationCount,revision+1,'surface-only input change was cached');
+ assert.ok(before.some((v,i)=>Math.abs(v-cage.data[i])>1e-5),'surface input did not affect rendered data');
+}
+if(process.argv.includes('--benchmark')){
+ const elapsed=[];
+ for(let i=0;i<160;i++){
+  bones[4].rotation.z=.6+Math.sin(i*.1)*.3;bones[5].rotation.z=1.4+Math.cos(i*.13)*.5;
+  cage.update();if(i>=30)elapsed.push(cage.lastMilliseconds);
+ }
+ elapsed.sort((a,b)=>a-b);
+ console.log({samples:elapsed.length,medianMs:elapsed[Math.floor(elapsed.length*.5)],p95Ms:elapsed[Math.floor(elapsed.length*.95)]});
+}
 

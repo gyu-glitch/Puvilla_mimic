@@ -7,6 +7,7 @@ import { NEUTRAL_PARAMS, type CharacterParams } from "./mapping";
 import type { CharacterRig } from "./proxy";
 import { fixInvertedWinding, parseObj, subdivide, toBufferGeometry, type PolyMesh } from "./subdivide";
 import {StandingCageSurface} from './standingCageSurface';
+import {clearStandingForearm,resolveStandingHeadContact} from './standingHeadClearance';
 import { fillMouthGroove, smoothDepth } from "./mouthRig";
 import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, makeKnitMaterial, pca, type MufflerSrc } from "./outfit";
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
@@ -1059,8 +1060,16 @@ export class PuuvillaCharacter implements CharacterRig {
           tf.copy(_qIdleF);
         }
       }
+      if(this.connectedArms && this.cfg.body.armHeadClearance){
+        const j=this.armJoints.find(j=>j.side===arm.side)!;
+        clearStandingForearm(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,head.quaternion);
+      }
       arm.qUpper.slerp(tu, k);
       arm.qFore.slerp(tf, k);
+      if(this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
+        const j=this.armJoints.find(j=>j.side===arm.side)!;
+        resolveStandingHeadContact(j.s,j.h.distanceTo(j.s),arm.restFore,arm.qUpper,arm.qFore,head.quaternion,dtSec);
+      }
       arm.upper.quaternion.copy(arm.qUpper);
       arm.fore.quaternion.copy(arm.qFore);
       if (this.armSurface) {
