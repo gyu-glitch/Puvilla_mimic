@@ -266,6 +266,9 @@ export interface Config {
     /** Standing model: topology-derived continuous skin, or legacy spatial weights for comparison. */
     armRig: "legacy" | "connected";
     armRigPath: string;
+    armShoulderMetric?: boolean;
+    armPawRollStart?: number;
+    armPawFrame?: boolean;
     armDeform?: 'surface' | 'cage';
     armCageRounded?: boolean;
     armHeadClearance?: boolean;
@@ -275,6 +278,7 @@ export interface Config {
     armTorsoClearance?: boolean;
     armPawContact?: boolean;
     armElbowPlane?: boolean;
+    armUpperClearance?: boolean;
   };
   scene: {
     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
@@ -577,6 +581,7 @@ export const DEFAULT_CONFIG: Config = {
     armTorsoClearance: true,
     armPawContact: true,
     armElbowPlane: true,
+    armPawFrame: true,
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,

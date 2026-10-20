@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {subdivide,toBufferGeometry,type PolyMesh} from './subdivide';
 import {subdivisionPlans} from './subdivisionPlan';
 import {RoundedElbowFrame} from './standingBend';
+import {StandingShoulderMetric} from './standingShoulderMetric';
 import type {StandingArmSurface} from './standingArmSurface';
 
 const smooth=(a:number,b:number,x:number)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
@@ -29,7 +30,9 @@ export class StandingCageSurface {
   private previousState:number[]=[];
   evaluationCount=0;
   lastMilliseconds=0;
-  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true){
+  private shoulderMetric:StandingShoulderMetric|null;
+  constructor(private part:PolyMesh,levels:number,private rig:CageRig,private skin:THREE.BufferGeometry,geo:THREE.BufferGeometry,private surface:StandingArmSurface,private rounded=true,metric=false,private rollStart=.30){
+    this.shoulderMetric=metric?new StandingShoulderMetric(part.positions,part.faces,rig.weights):null;
     this.plans=subdivisionPlans(part,levels);
     this.points=new Float64Array(part.positions.length*3);
     const fine=subdivide(part,levels);
@@ -99,7 +102,7 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
       p.fromArray(this.part.positions[i]);const side=p.x>=0?0:1,w=this.rig.weights[i],mask=Math.min(1,w[0]+w[1]);
       const axis=this.axes[side],origin=this.origin[side],len=this.lengths[side];
       const t=v.copy(p).sub(origin).dot(axis)/len;
-      p.sub(origin).applyAxisAngle(axis,this.surface.turn.value.getComponent(side)*smooth(.30,.84,t)*mask).add(origin);
+      p.sub(origin).applyAxisAngle(axis,this.surface.turn.value.getComponent(side)*smooth(this.rollStart,.84,t)*mask).add(origin);
       const wrist=this.surface.wrist.value[side],bend=wrist.length();
       if(bend>1e-6){v.copy(origin).addScaledVector(axis,len*.84);p.sub(v).applyQuaternion(rot.setFromAxisAngle(sum.copy(wrist).normalize(),bend*smooth(.81,.86,t)*mask)).add(v);}
       local.copy(p);
@@ -130,6 +133,7 @@ if(uCageReady>.5 && cagePosition.w>.5)transformed=cagePosition.xyz;`);
       p.add(v.fromArray(correction).applyQuaternion(this.surface.correctiveRotation.value[side]).multiplyScalar(this.surface.socketActivation.value.getComponent(side)));
       p.toArray(this.points,i*3);
     }
+    this.shoulderMetric?.apply(this.points);
     let fine=this.points;for(const plan of this.plans)fine=plan.evaluate(fine);
     const normals=this.normals;normals.fill(0);
     for(const face of this.faces){
