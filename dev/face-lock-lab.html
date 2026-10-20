@@ -1,0 +1,45 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8">
+<title>세로 얼굴 락 유지 검증</title>
+<style>body{margin:0;color:white;font:15px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>합성 세로 입력: 옆으로 이동하며 고개 돌림
+<button id="before">이전</button><button id="after">수정</button>
+<div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal} from '/src/character/mapping.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {SignalProcessor as Before} from '/dev/signals-before-v38.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();cfg.scene.outputMirror=false;cfg.scene.layout='landscape';
+cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
+await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let signal,state,processor,fixed=false;
+const face=(cx,yaw)=>({bbox:{cx,cy:.3,x:cx-.085,y:.23,w:.17,h:.14},
+ yaw,pitch:0,roll:0,blend:{},mouth:{open:.12,corner:0},eyes:{left:.2,right:.2}});
+function probe(corrected){
+ fixed=corrected;processor=new (fixed?SignalProcessor:Before)(cfg);
+ const fsm=new MimicStateMachine(cfg);
+ for(let t=0;t<=2000;t+=1000/30){
+  signal=processor.update({faces:[face(.5,0)],inferenceMs:5},t,9/16);state=fsm.update(signal,t);
+ }
+ // Freeze the sample immediately after a lateral movement at the same scale.
+ signal=processor.update({faces:[face(.6,35)],inferenceMs:5},2033,9/16);
+ state=fsm.update(signal,2033);
+}
+document.querySelector('#before').onclick=()=>probe(false);
+document.querySelector('#after').onclick=()=>probe(true);probe(false);
+let last=performance.now();
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ ch.setState(state);ch.apply(mapSignal(signal,cfg.mapping),dt,0,null);scene.render();
+ document.querySelector('#status').textContent=
+ `${fixed?'수정':'이전'} | 얼굴 LOCK ${processor.debugFaces[0]?.locked} | 입력 x .600 / 추적 x ${processor.target.cx.toFixed(3)} | ${state.state}`;
+ requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+</script></body></html>

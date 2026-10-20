@@ -89,21 +89,25 @@ export class SignalProcessor {
    * - 대상의 얼굴 박스가 영역에서 완전히 벗어나거나 안 보인 지 faceLostHoldMs 가 지나면 해제 → 영역 안에서 새로 찾음
    * - 새로 찾을 때: 영역 안 얼굴 중 '가까움(얼굴 크기) × 영역 중심에 가까움' 점수가 가장 높은 사람
    */
-  private pickTarget(faces: RawFace[], nowMs: number): RawFace | null {
+  private pickTarget(faces: RawFace[], nowMs: number, imageAspect: number): RawFace | null {
     const p = this.cfg.presence;
     if (this.lastTarget) {
       const lt = this.lastTarget;
-      let match: RawFace | null = null, bestD = Infinity;
-      for (const f of faces) {
+      // Compare in pixel-isotropic coordinates (both axes / image height).
+      // Raw normalized x is too strict for portrait footage and too loose
+      // for landscape. After a brief occlusion allow bounded movement, not
+      // an unrestricted switch to whichever face remains.
+      const gap = Math.max(0, nowMs - this.lastSeenMs);
+      const radius = Math.max(0.05, lt.h * (0.5 + Math.min(0.5, gap / 800)));
+      const candidates = faces.map(f => {
         const ratio = f.bbox.h / lt.h;
-        if (ratio < 0.75 || ratio > 1.33) continue; // 한 프레임 사이 얼굴 크기는 크게 안 변함
-        const d = Math.hypot(f.bbox.cx - lt.cx, f.bbox.cy - lt.cy);
-        if (d < bestD) {
-          bestD = d;
-          match = f;
-        }
-      }
-      if (match && bestD < Math.max(0.05, lt.h * 0.5) && this.touchesZone(match)) {
+        const distance = Math.hypot((f.bbox.cx - lt.cx) * imageAspect, f.bbox.cy - lt.cy);
+        return { f, ratio, distance, score: distance / lt.h + Math.abs(Math.log(ratio)) * 0.25 };
+      }).filter(c => c.ratio >= 0.65 && c.ratio <= 1.5 && c.distance < radius && this.touchesZone(c.f))
+        .sort((a, b) => a.score - b.score);
+      const match = candidates.length && (candidates.length === 1 || candidates[1].score - candidates[0].score > 0.2)
+        ? candidates[0].f : null;
+      if (match) {
         this.lockMissSinceMs = 0;
         this.lastTarget = { cx: match.bbox.cx, cy: match.bbox.cy, h: match.bbox.h };
         return match;
@@ -157,7 +161,8 @@ export class SignalProcessor {
     const p = this.cfg.presence;
     const mirror = this.cfg.camera.mirror ? -1 : 1;
     this.lastFaces = track.faces;
-    const target = this.pickTarget(track.faces, nowMs);
+    const aspect = Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : 1;
+    const target = this.pickTarget(track.faces, nowMs, aspect);
 
     if (target) {
       this.lastSeenMs = nowMs;
@@ -167,7 +172,7 @@ export class SignalProcessor {
       // Preserve landscape distance tuning while using the short side for a
       // portrait source. Otherwise a locked portrait face can never enter
       // MIMIC at the same framing: its normalized height is much smaller.
-      const shortSide = Number.isFinite(imageAspect) && imageAspect > 0 ? Math.min(1, imageAspect) : 1;
+      const shortSide = Math.min(1, aspect);
       const bboxH = this.fBbox.filter(target.bbox.h / shortSide, t);
       const cxRaw = this.cfg.camera.mirror ? 1 - target.bbox.cx : target.bbox.cx;
       const cx = this.fCx.filter(cxRaw, t);
@@ -189,8 +194,11 @@ export class SignalProcessor {
 
       // 접근 히스테리시스 + 화면 중앙 근처 조건
       const centered = Math.abs(cx - 0.5) <= p.centerToleranceX;
+      // Acquisition still requires the center band. An acquired visitor
+      // remains centered while their face overlaps it, avoiding edge chatter.
+      const centeredHeld = Math.abs(cx - 0.5) <= p.centerToleranceX + target.bbox.w * 0.5;
       if (!this.near && bboxH >= p.enterBboxHeight && centered) this.near = true;
-      else if (this.near && (bboxH <= p.exitBboxHeight || !centered)) this.near = false;
+      else if (this.near && (bboxH <= p.exitBboxHeight || !centeredHeld)) this.near = false;
 
       this.sig = {
         present: true,
