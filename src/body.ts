@@ -1,7 +1,7 @@
 import type { Config } from "./config";
 import type { RawPose } from "./poseTracker";
 import { OneEuroBank } from "./smoothing";
-import { Quaternion, Vector3 } from "three";
+import { Vector3 } from "three";
 import { alignedCameraArm } from "./armImageAlignment";
 
 export type V3 = [number, number, number];
@@ -166,7 +166,6 @@ export class BodyProcessor {
       shoulderL: pick(side.L[0]), elbowL: pick(side.L[1]), wristL: pick(side.L[2]), hipL: pick(side.L[3]),
       shoulderR: pick(side.R[0]), elbowR: pick(side.R[1]), wristR: pick(side.R[2]), hipR: pick(side.R[3]),
     };
-    const handFrames: {L?:Quaternion;R?:Quaternion}={};
     for (const s of ["L","R"] as const) {
       if (armConfidence[s]===0 || held[s]) continue;
       const aligned=alignedCameraArm(raw,side[s],mirror);
@@ -174,7 +173,6 @@ export class BodyProcessor {
       const shoulder=new Vector3(...pts[`shoulder${s}`]),elbow=new Vector3(...pts[`elbow${s}`]);
       const oldFore=new Vector3(...pts[`wrist${s}`]).sub(elbow);
       const upperLength=elbow.distanceTo(shoulder),foreLength=oldFore.length();
-      handFrames[s]=new Quaternion().setFromUnitVectors(oldFore.normalize(),aligned.fore);
       elbow.copy(shoulder).addScaledVector(aligned.upper,upperLength);
       pts[`elbow${s}`]=elbow.toArray();
       pts[`wrist${s}`]=elbow.addScaledVector(aligned.fore,foreLength).toArray();
@@ -214,14 +212,14 @@ export class BodyProcessor {
       const a=pick(index),b=pick(pinky),span=a.map((v,i)=>v-b[i]) as V3;
       const length=Math.hypot(...span);
       if(length<.015||length>.20)continue;
+      // Finger landmarks observe the palm independently. Correcting the arm's
+      // depth must not rotate this plane along with the inferred forearm.
       const spanAligned=new Vector3(...span).divideScalar(length);
-      if(handFrames[s])spanAligned.applyQuaternion(handFrames[s]);
       hands[`handAcross${s}`]=spanAligned.toArray().map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v,t)) as V3;
       const wrist=pick(side[s][2]),forward=a.map((v,i)=>(v+b[i])*.5-wrist[i]) as V3;
       const reach=Math.hypot(...forward);
       if(reach>=.025&&reach<=.18){
         const forwardAligned=new Vector3(...forward).divideScalar(reach);
-        if(handFrames[s])forwardAligned.applyQuaternion(handFrames[s]);
         hands[`handDirection${s}`]=forwardAligned.toArray().map((v,i)=>this.bank.filter(`handDirection${s}${i}`,v,t)) as V3;
       }
     }

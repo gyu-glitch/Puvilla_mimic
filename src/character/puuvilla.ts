@@ -190,6 +190,7 @@ export class PuuvillaCharacter implements CharacterRig {
   /** Development comparison only; never enabled by production configuration. */
   debugLegacyArmFrame = false;
   debugLegacyTorso = false;
+  debugLegacyPalm = false;
   /** Development comparison; null keeps the normal raised-paw roll. */
   debugPawTurn: number | null = null;
 
@@ -1143,7 +1144,8 @@ export class PuuvillaCharacter implements CharacterRig {
         // Roll the supplied paw without scaling its width or length.
         let target = arm.side * (this.debugPawTurn ?? -Math.PI/2) * raised;
         if(this.cfg.body.armPawFrame && this.debugPawTurn===null){
-          const front=standingFrontPawRoll(arm.restFore,arm.qUpper,arm.qFore,arm.side,target);
+          const viewer=this.debugLegacyPalm?undefined:new THREE.Vector3(0,0,1).applyQuaternion(armFrame.clone().invert());
+          const front=standingFrontPawRoll(arm.restFore,arm.qUpper,arm.qFore,arm.side,target,viewer);
           target+=Math.atan2(Math.sin(front-target),Math.cos(front-target))*raised;
         }
         let trackedRoll:number|null=null;
@@ -1153,8 +1155,11 @@ export class PuuvillaCharacter implements CharacterRig {
             .sub(vec(arm.side>0?pose!.elbowL:pose!.elbowR)).normalize()
             .applyQuaternion(armFrame.clone().invert());
           if(this.cfg.body.armPawFrame){
+            const handForward=arm.side>0?pose!.handDirectionL:pose!.handDirectionR;
             trackedRoll=standingPawRoll(arm.restFore,arm.qUpper,arm.qFore,target,
-              humanFore,vec(across).applyQuaternion(armFrame.clone().invert()));
+              humanFore,vec(across).applyQuaternion(armFrame.clone().invert()),
+              !this.debugLegacyPalm&&handForward?vec(handForward).applyQuaternion(armFrame.clone().invert()):undefined,
+              this.armSurface.wrist.value[i]);
           }else{
           const tracked=vec(across).applyQuaternion(armFrame.clone().invert())
             .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(humanFore,direction));

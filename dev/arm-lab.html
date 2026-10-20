@@ -2,7 +2,7 @@
 <html lang="ko"><head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex 팔 리그 검증</title>
 <style>body{margin:0;font:14px system-ui;color:#fff}#app{position:fixed;inset:0}nav{position:fixed;z-index:3;left:12px;top:12px;right:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#17212de8;border-radius:12px}select,button{font:inherit;padding:6px}#status{position:fixed;z-index:3;bottom:12px;left:12px;white-space:pre-wrap;background:#17212de8;padding:12px;border-radius:10px}</style></head>
 <body><div id="app"></div><nav><strong>Codex · 원본 팔 검증</strong>
-<label>동작 <select id="pose"><option value="jitter">정지 자세 / 경계값 흔들림</option><option value="sustain">양팔 오래 들기 / 얼굴 가림</option><option value="depthpair">같은 높이 / 왼팔 깊이 오차</option><option value="tracking">가림·불확실 검출·재검출</option><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="elbowflex">팔꿈치 굽혔다 펴기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="bothgreet">양팔 대칭 인사</option><option value="straightlift">편 팔 그대로 들기</option><option value="palmwave">손바닥 정면 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="reachin">머리 안쪽 들기</option><option value="reachsweep">안쪽 들기 연속</option><option value="cross">가로지르기</option><option value="waist">허리 앞 손</option><option value="belly">허리 주변 움직임</option><option value="clap">양손 모으기</option><option value="fold">깊은 굽힘 경계</option><option value="foldrecover">깊은 굽힘 복귀</option></select></label>
+<label>동작 <select id="pose"><option value="palmnear">손바닥 유지 / 얼굴 가까이</option><option value="jitter">정지 자세 / 경계값 흔들림</option><option value="sustain">양팔 오래 들기 / 얼굴 가림</option><option value="depthpair">같은 높이 / 왼팔 깊이 오차</option><option value="tracking">가림·불확실 검출·재검출</option><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="elbowflex">팔꿈치 굽혔다 펴기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="bothgreet">양팔 대칭 인사</option><option value="straightlift">편 팔 그대로 들기</option><option value="palmwave">손바닥 정면 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="reachin">머리 안쪽 들기</option><option value="reachsweep">안쪽 들기 연속</option><option value="cross">가로지르기</option><option value="waist">허리 앞 손</option><option value="belly">허리 주변 움직임</option><option value="clap">양손 모으기</option><option value="fold">깊은 굽힘 경계</option><option value="foldrecover">깊은 굽힘 복귀</option></select></label>
 <label>시점 <select id="view"><option value="0">정면</option><option value="45">45도</option><option value="90">측면</option><option value="180">뒤</option></select></label>
 <label>표현 <select id="look"><option value="surface">표면 확인</option><option value="fur">털 포함</option><option value="final">유화 포함</option></select></label>
 <label>범위 <select id="range"><option value="3">전체</option><option value="1.2">기존 제한</option></select></label>
@@ -25,6 +25,8 @@ import {BodyTargetLock} from '/src/bodyTarget.ts';
 import {MimicStateMachine} from '/src/state.ts';
 import {emptySignal} from '/src/signals.ts';
 import {BodyProcessor as BeforeJitter} from '/dev/body-before-v27.ts';
+import {BodyProcessor as BeforePalm} from '/dev/body-before-v28.ts';
+import {armPalmFixture} from '/dev/arm-palm-fixture.ts';
 import {armJitterFixture} from '/dev/arm-jitter-fixture.ts';
 import {armSessionFixture} from '/dev/arm-session-fixture.ts';
 const cfg=JSON.parse(JSON.stringify(await loadConfig('/config.json')).replaceAll('./models/','/models/'));
@@ -71,12 +73,14 @@ scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
 const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
 const qp=new URLSearchParams(location.search);
 let trackingProcessor=new (qp.get('tracking')==='before'?BeforeTracking:BodyProcessor)(cfg);
-let sessionProcessor,sessionTarget,sessionFSM,jitterProcessor,lastJitterFrame=-1;
+let sessionProcessor,sessionTarget,sessionFSM,jitterProcessor,lastJitterFrame=-1,palmProcessor,lastPalmFrame=-1;
+function resetPalm(){palmProcessor=new (qp.get('palmnear')==='before'?BeforePalm:BodyProcessor)(cfg);lastPalmFrame=-1;}
+resetPalm();character.debugLegacyPalm=qp.get('palmnear')==='before';
 function resetJitter(){jitterProcessor=new (qp.get('jitter')==='before'?BeforeJitter:BodyProcessor)(cfg);lastJitterFrame=-1;}
 resetJitter();character.debugLegacyTorso=qp.get('jitter')==='before';
 function resetSession(){sessionProcessor=new (qp.get('session')==='before'?BeforeSession:BodyProcessor)(cfg);sessionTarget=new BodyTargetLock();sessionFSM=new MimicStateMachine(cfg);}
 resetSession();character.debugLegacyArmFrame=qp.get('session')==='before'||qp.get('frame')==='legacy';
-const reviewTag=(qp.has('jitter')?'codex-v27-jitter-'+qp.get('jitter'):qp.has('session')?'codex-v26-session-'+qp.get('session'):qp.has('twist')?'codex-v25-twist-'+qp.get('twist'):qp.has('tracking')?'codex-v24-tracking-'+qp.get('tracking'):socketTest==='mirrorleft'?'codex-v23-mirror-left':qp.get('followpose')==='1'?'codex-v22-follow-pose':qp.get('pawframe')==='1'?'codex-v21-paw-frame'+(socketTest?'-'+socketTest:''):['wrapsoft','wrapraw','mirrorleft'].includes(socketTest)?'codex-v20-'+socketTest:qp.has('rollstart')?'codex-v19-roll-'+qp.get('rollstart').replaceAll('.','p'):qp.get('shouldermetric')==='1'?'codex-v18-shoulder-metric':qp.get('upperclear')==='1'?'codex-v17-upper-contact':qp.get('elbowplane')==='1'?'codex-v15-elbow-plane':qp.get('pawcontact')==='1'?'codex-v14-paw-contact':qp.get('bodyclear')==='1'?'codex-v13-torso':qp.has('curve')?'codex-v12-curve':qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('upper')?`-upper${qp.get('upper').replaceAll('.','p')}`:'')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
+const reviewTag=(qp.has('palmnear')?'codex-v28-palm-'+qp.get('palmnear'):qp.has('jitter')?'codex-v27-jitter-'+qp.get('jitter'):qp.has('session')?'codex-v26-session-'+qp.get('session'):qp.has('twist')?'codex-v25-twist-'+qp.get('twist'):qp.has('tracking')?'codex-v24-tracking-'+qp.get('tracking'):socketTest==='mirrorleft'?'codex-v23-mirror-left':qp.get('followpose')==='1'?'codex-v22-follow-pose':qp.get('pawframe')==='1'?'codex-v21-paw-frame'+(socketTest?'-'+socketTest:''):['wrapsoft','wrapraw','mirrorleft'].includes(socketTest)?'codex-v20-'+socketTest:qp.has('rollstart')?'codex-v19-roll-'+qp.get('rollstart').replaceAll('.','p'):qp.get('shouldermetric')==='1'?'codex-v18-shoulder-metric':qp.get('upperclear')==='1'?'codex-v17-upper-contact':qp.get('elbowplane')==='1'?'codex-v15-elbow-plane':qp.get('pawcontact')==='1'?'codex-v14-paw-contact':qp.get('bodyclear')==='1'?'codex-v13-torso':qp.has('curve')?'codex-v12-curve':qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('upper')?`-upper${qp.get('upper').replaceAll('.','p')}`:'')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
 if(qp.get('source')==='1')document.querySelector('#record').disabled=true;
 let recordEpoch=null;
 document.querySelector('#hold').checked=qp.get('hold')==='1';
@@ -98,11 +102,11 @@ document.querySelector('#capture').addEventListener('click',async()=>{
 document.querySelector('#record').addEventListener('click',()=>{
  const button=document.querySelector('#record');button.disabled=true;button.textContent='녹화 중';
  const name=`${reviewTag}-${controls.pose.value}-${controls.view.value}`;
- const duration=controls.pose.value==='jitter'?16000:controls.pose.value==='sustain'?20000:controls.pose.value==='belly'?24000:['depthpair','tracking','greet','sweep','nearhead','clap','foldrecover','elbowflex','reachsweep','palmwave','straightlift','bothgreet'].includes(controls.pose.value)?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
+ const duration=controls.pose.value==='palmnear'?16000:controls.pose.value==='jitter'?16000:controls.pose.value==='sustain'?20000:controls.pose.value==='belly'?24000:['depthpair','tracking','greet','sweep','nearhead','clap','foldrecover','elbowflex','reachsweep','palmwave','straightlift','bothgreet'].includes(controls.pose.value)?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
  const locked=[...document.querySelectorAll('select,input,#capture')];locked.forEach(el=>el.disabled=true);
  document.querySelector('#hold').checked=false;
  recordEpoch=performance.now()+700;
- character.resetArmContact();resetSession();resetJitter();
+ character.resetArmContact();resetSession();resetJitter();resetPalm();
  trackingProcessor=new (qp.get('tracking')==='before'?BeforeTracking:BodyProcessor)(cfg);
  const src=controls.look.value==='final'?document.querySelector('#app + canvas'):scene.renderer.domElement;
  const stream=src.captureStream(30),chunks=[];
@@ -197,6 +201,7 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
  }
  if(controls.pose.value==='tracking')input=trackingProcessor.update(armTrackingFixture(t).raw,true,now);
  if(controls.pose.value==='jitter'){const frame=Math.floor(t*15);input=jitterProcessor.update(armJitterFixture(t).raw,frame!==lastJitterFrame,now);lastJitterFrame=frame;}
+ if(controls.pose.value==='palmnear'){const frame=Math.floor(t*15);input=palmProcessor.update(armPalmFixture(t).raw,frame!==lastPalmFrame,now);lastPalmFrame=frame;}
  let snap={state:'MIMIC',elapsedMs:now,progress:1};
  if(['sustain','depthpair'].includes(controls.pose.value)){
   const fixture=armSessionFixture(t,controls.pose.value==='sustain'),face=fixture.faceHeld?{cx:.5,cy:.3,h:.3}:null;
