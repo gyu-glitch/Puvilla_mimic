@@ -2,7 +2,7 @@
 <html lang="ko"><head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex 팔 리그 검증</title>
 <style>body{margin:0;font:14px system-ui;color:#fff}#app{position:fixed;inset:0}nav{position:fixed;z-index:3;left:12px;top:12px;right:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:#17212de8;border-radius:12px}select,button{font:inherit;padding:6px}#status{position:fixed;z-index:3;bottom:12px;left:12px;white-space:pre-wrap;background:#17212de8;padding:12px;border-radius:10px}</style></head>
 <body><div id="app"></div><nav><strong>Codex · 원본 팔 검증</strong>
-<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="elbowflex">팔꿈치 굽혔다 펴기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="straightlift">편 팔 그대로 들기</option><option value="palmwave">손바닥 정면 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="reachin">머리 안쪽 들기</option><option value="reachsweep">안쪽 들기 연속</option><option value="cross">가로지르기</option><option value="waist">허리 앞 손</option><option value="belly">허리 주변 움직임</option><option value="clap">양손 모으기</option><option value="fold">깊은 굽힘 경계</option><option value="foldrecover">깊은 굽힘 복귀</option></select></label>
+<label>동작 <select id="pose"><option value="rest">내리기</option><option value="side">옆으로 벌리기</option><option value="up">만세</option><option value="elbow">팔꿈치 굽히기</option><option value="elbowflex">팔꿈치 굽혔다 펴기</option><option value="front">앞으로 뻗기</option><option value="wave">한 손 인사</option><option value="bothgreet">양팔 대칭 인사</option><option value="straightlift">편 팔 그대로 들기</option><option value="palmwave">손바닥 정면 인사</option><option value="waveleft">반대손 인사</option><option value="greet">들고 내리기</option><option value="sweep">연속 움직임</option><option value="nearhead">머리 가까이</option><option value="reachin">머리 안쪽 들기</option><option value="reachsweep">안쪽 들기 연속</option><option value="cross">가로지르기</option><option value="waist">허리 앞 손</option><option value="belly">허리 주변 움직임</option><option value="clap">양손 모으기</option><option value="fold">깊은 굽힘 경계</option><option value="foldrecover">깊은 굽힘 복귀</option></select></label>
 <label>시점 <select id="view"><option value="0">정면</option><option value="45">45도</option><option value="90">측면</option><option value="180">뒤</option></select></label>
 <label>표현 <select id="look"><option value="surface">표면 확인</option><option value="fur">털 포함</option><option value="final">유화 포함</option></select></label>
 <label>범위 <select id="range"><option value="3">전체</option><option value="1.2">기존 제한</option></select></label>
@@ -37,7 +37,7 @@ cfg.body.armTorsoClearance=new URLSearchParams(location.search).get('bodyclear')
 if(new URLSearchParams(location.search).get('weights')==='sections')cfg.body.armRigPath='/models/stand_connected_rig_sections.json';
 if(new URLSearchParams(location.search).get('weights')==='portrait')cfg.body.armRigPath='/models/stand_connected_rig_portrait.json';
 const socketTest=new URLSearchParams(location.search).get('socket');
-if(['12','zero','pivot','fair','arap','arapcap','arapsolid','araplift','araprelative','wrap','wrapsolve','wrapfair','wrapsoft','wrapraw'].includes(socketTest))cfg.body.armRigPath=`/dev/stand_socket_${socketTest}.json`;
+if(['12','zero','pivot','fair','arap','arapcap','arapsolid','araplift','araprelative','wrap','wrapsolve','wrapfair','wrapsoft','wrapraw','mirrorleft'].includes(socketTest))cfg.body.armRigPath=`/dev/stand_socket_${socketTest}.json`;
 cfg.character.modelPath='/models/pu_stand.obj'; cfg.outfit.seatBody=false; cfg.outfit.sitBody=false;cfg.outfit.style='christmas';
 if(new URLSearchParams(location.search).get('candidate')==='posefirst'){cfg.character.modelPath='/dev/stand_pose_first_preview.obj';cfg.body.armRig='legacy';}
 if(new URLSearchParams(location.search).get('candidate')==='posefirstwrap'){cfg.character.modelPath='/dev/stand_pose_first_wrap.obj';cfg.body.armRig='legacy';}
@@ -59,7 +59,7 @@ if(new URLSearchParams(location.search).has('turn'))character.debugPawTurn=Numbe
 scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
 const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
 const qp=new URLSearchParams(location.search);
-const reviewTag=(qp.get('followpose')==='1'?'codex-v22-follow-pose':qp.get('pawframe')==='1'?'codex-v21-paw-frame'+(socketTest?'-'+socketTest:''):['wrapsoft','wrapraw'].includes(socketTest)?'codex-v20-'+socketTest:qp.has('rollstart')?'codex-v19-roll-'+qp.get('rollstart').replaceAll('.','p'):qp.get('shouldermetric')==='1'?'codex-v18-shoulder-metric':qp.get('upperclear')==='1'?'codex-v17-upper-contact':qp.get('elbowplane')==='1'?'codex-v15-elbow-plane':qp.get('pawcontact')==='1'?'codex-v14-paw-contact':qp.get('bodyclear')==='1'?'codex-v13-torso':qp.has('curve')?'codex-v12-curve':qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('upper')?`-upper${qp.get('upper').replaceAll('.','p')}`:'')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
+const reviewTag=(socketTest==='mirrorleft'?'codex-v23-mirror-left':qp.get('followpose')==='1'?'codex-v22-follow-pose':qp.get('pawframe')==='1'?'codex-v21-paw-frame'+(socketTest?'-'+socketTest:''):['wrapsoft','wrapraw','mirrorleft'].includes(socketTest)?'codex-v20-'+socketTest:qp.has('rollstart')?'codex-v19-roll-'+qp.get('rollstart').replaceAll('.','p'):qp.get('shouldermetric')==='1'?'codex-v18-shoulder-metric':qp.get('upperclear')==='1'?'codex-v17-upper-contact':qp.get('elbowplane')==='1'?'codex-v15-elbow-plane':qp.get('pawcontact')==='1'?'codex-v14-paw-contact':qp.get('bodyclear')==='1'?'codex-v13-torso':qp.has('curve')?'codex-v12-curve':qp.get('azimuth')==='1'?'codex-v11-azimuth':qp.get('pawhold')==='1'?'codex-v10-paw-hold':qp.has('palm')?'codex-v9-paw-drop':qp.has('clearance')?'codex-v9-contact':qp.get('deform')==='cage'?`codex-v8-${qp.get('elbow')==='dq'?'cage':'rounded-cage'}-${socketTest??'base'}`:qp.get('candidate')==='posefirstwrap'?'codex-v8-posefirstwrap':qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v8-socket-${socketTest}`:'codex-v7')+(qp.has('upper')?`-upper${qp.get('upper').replaceAll('.','p')}`:'')+(qp.has('bend')?`-bend${qp.get('bend').replaceAll('.','p')}`:'')+(qp.has('time')?`-t${qp.get('time').replaceAll('.','p')}`:'')+(qp.has('head')?'-head':'')+(qp.has('torso')?'-torso':'');
 if(qp.get('source')==='1')document.querySelector('#record').disabled=true;
 let recordEpoch=null;
 document.querySelector('#hold').checked=qp.get('hold')==='1';
@@ -81,7 +81,7 @@ document.querySelector('#capture').addEventListener('click',async()=>{
 document.querySelector('#record').addEventListener('click',()=>{
  const button=document.querySelector('#record');button.disabled=true;button.textContent='녹화 중';
  const name=`${reviewTag}-${controls.pose.value}-${controls.view.value}`;
- const duration=controls.pose.value==='belly'?24000:['greet','sweep','nearhead','clap','foldrecover','elbowflex','reachsweep','palmwave','straightlift'].includes(controls.pose.value)?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
+ const duration=controls.pose.value==='belly'?24000:['greet','sweep','nearhead','clap','foldrecover','elbowflex','reachsweep','palmwave','straightlift','bothgreet'].includes(controls.pose.value)?12000:['wave','waveleft'].includes(controls.pose.value)?9200:6000;
  const locked=[...document.querySelectorAll('select,input,#capture')];locked.forEach(el=>el.disabled=true);
  document.querySelector('#hold').checked=false;
  recordEpoch=performance.now()+700;
@@ -103,6 +103,11 @@ document.querySelector('#record').addEventListener('click',()=>{
 function pose(t){
  if(controls.pose.value==='wave')return standingWavePose(t);
  if(controls.pose.value==='waveleft')return standingWavePose(t,1,1);
+ if(controls.pose.value==='bothgreet'){
+  const phase=t%12,a=document.querySelector('#hold').checked?1:phase<2?phase/2:phase<8?1:phase<10?1-(phase-8)/2:0,amount=a*a*(3-2*a);
+  const r=standingWavePose(t,amount,-1),l=standingWavePose(t,amount,1);
+  return {...r,shoulderL:l.shoulderL,elbowL:l.elbowL,wristL:l.wristL,handDirectionL:l.handDirectionL};
+ }
  if(controls.pose.value==='greet'){
   const phase=t%12;let a=phase<2?phase/2:phase<8?1:phase<10?1-(phase-8)/2:0;
   return standingWavePose(t,a*a*(3-2*a));

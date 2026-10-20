@@ -574,7 +574,7 @@ export const DEFAULT_CONFIG: Config = {
     elbowGain: 1.0,
     armRaiseMaxRad: 3.0,
     armRig: "connected",
-    armRigPath: "./models/stand_connected_cage_rig.json",
+    armRigPath: "./models/stand_connected_cage_mirrorleft.json",
     armDeform: 'cage',
     armHeadClearance: false,
     armHeadContact: false,

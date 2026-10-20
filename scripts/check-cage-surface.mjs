@@ -7,7 +7,7 @@ const {parseObj,subdivide,toBufferGeometry}=await import('../src/character/subdi
 const {StandingCageSurface}=await import('../src/character/standingCageSurface.ts');
 const {StandingArmSurface}=await import('../src/character/standingArmSurface.ts');
 const part=parseObj(readFileSync('public/models/pu_stand.obj','utf8')).find(p=>p.name==='pu_body');
-const rig=JSON.parse(readFileSync('public/models/stand_connected_cage_rig.json','utf8'));
+const rig=JSON.parse(readFileSync(process.argv.find(a=>a.startsWith('--rig='))?.slice(6)??'public/models/stand_connected_cage_rig.json','utf8'));
 const baselineRig=JSON.parse(readFileSync('public/models/stand_connected_rig.json','utf8'));
 assert.deepEqual(rig.rest,part.positions,'cage source changed');
 assert.equal(rig.shoulderSkin.length,80,'unexpected shoulder support expansion');
