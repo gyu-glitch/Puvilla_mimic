@@ -41,6 +41,7 @@ export class Overlay {
     const onC = hooks.onCharacterChange;
 
     const f1 = this.gui.addFolder("접근 판정 — 언제 등장/퇴장할지");
+    f1.add(cfg.presence, "mimicOnLock").name("락온되면 바로 따라하기 (거리 제한 해제)");
     f1.add(cfg.presence, "enterBboxHeight", 0.05, 0.6, 0.005)
       .name("등장: 얼굴 크기 ≥ (입력 짧은 변 비율)");
     f1.add(cfg.presence, "exitBboxHeight", 0.03, 0.5, 0.005)
@@ -54,10 +55,10 @@ export class Overlay {
     f1.add(cfg.presence, "attractAfterMs", 1000, 60000, 500)
       .name("아무도 없을 때 유도 시작 (ms)");
     f1.add(cfg.presence, "lockCenterWeight", 0, 1, 0.05)
-      .name("락온: 가운데 우선 정도 (0=가까운 사람만)");
+      .name("거리 제한 모드: 가운데 우선 정도");
     const hint = document.createElement("div");
     hint.style.cssText = "padding:4px 8px 8px;font-size:11px;line-height:1.4;color:#9aa0ad";
-    hint.textContent = "얼굴 크기 = 왼쪽 아래 'bboxH' 값. 거울 앞 원하는 거리에 서서 그 값을 '등장'에, 조금 더 먼 거리 값을 '멀어짐'에 넣는다 (등장 > 멀어짐). 락온 영역은 오른쪽 아래 카메라 화면의 노란 박스를 마우스로 끌어 옮기고, 모서리를 끌어 크기를 바꾼다. 놓친 대상은 '얼굴 놓쳐도 유지' 시간 동안 다른 사람으로 안 바뀜.";
+    hint.textContent = "기본은 노란 영역 안에서 가장 큰 얼굴을 잡아 바로 따라한다. 잡은 사람은 크기가 조금 변해도 유지하고, 놓치면 다시 선택한다. '락온되면 바로 따라하기'를 끄면 얼굴 크기·중앙 범위·가운데 우선 조건을 추가로 적용한다. 노란 박스를 끌어 락온 영역을 옮기거나 크기를 바꿀 수 있다.";
     f1.$children.appendChild(hint);
 
     const f2 = this.gui.addFolder("고개·표정 매핑 — 얼마나 크게 따라할지");

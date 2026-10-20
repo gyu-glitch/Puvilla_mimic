@@ -52,7 +52,7 @@ export class MimicStateMachine {
     const elapsed = nowMs - this.enteredAt;
 
     // 멀어짐 타이머 — MIMIC 중에만 의미 있음
-    const near=(sig.present && sig.near) || (!sig.present && trackedBodyPresent &&
+    const near=(sig.present && (p.mimicOnLock || sig.near)) || (!sig.present && trackedBodyPresent &&
       (this.state==="MIMIC" || this.state==="ENTER"));
     if (near) this.awayAt = null;
     else if (this.awayAt === null) this.awayAt = nowMs;

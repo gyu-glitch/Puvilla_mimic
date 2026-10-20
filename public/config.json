@@ -37,6 +37,7 @@
     "dCutoff": 1
   },
   "presence": {
+    "mimicOnLock": true,
     "enterBboxHeight": 0.22,
     "exitBboxHeight": 0.15,
     "centerToleranceX": 0.35,

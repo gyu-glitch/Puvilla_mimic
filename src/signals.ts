@@ -126,7 +126,10 @@ export class SignalProcessor {
       if (!this.inZone(f)) continue;
       const x = this.cfg.camera.mirror ? 1 - f.bbox.cx : f.bbox.cx;
       const dc = Math.min(1, Math.hypot(x - zcx, f.bbox.cy - zcy) / half);
-      const score = f.bbox.h * (1 - p.lockCenterWeight * dc);
+      // Direct mimic chooses the largest visible face inside the operator's
+      // zone. A centrality preference must not make a smaller bystander win.
+      const score = p.mimicOnLock ? f.bbox.w * f.bbox.h
+        : f.bbox.h * (1 - p.lockCenterWeight * dc);
       if (score > bestScore) {
         bestScore = score;
         pick = f;

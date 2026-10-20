@@ -1,0 +1,54 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8">
+<title>락온 후 미믹 시작 검증</title>
+<style>body{margin:0;color:white;font:15px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>현장 크기(.182) 합성 얼굴·팔 신호 → 실제 상태머신·캐릭터
+<button id="before">이전 판정</button><button id="after">수정 판정</button>
+<select id="view"><option value="0">정면</option><option value="45">사선</option><option value="90">측면</option></select>
+<button id="record">8초 영상 저장</button>
+<div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal,NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {standingWavePose} from '/src/standingWave.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();
+cfg.presence.mimicOnLock=false;
+cfg.scene.outputMirror=false;cfg.scene.layout='landscape';
+cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
+await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);
+scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let corrected=false,processor=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg),start=performance.now(),last=start;
+document.querySelector('#view').onchange=e=>{ch.root.rotation.y=Number(e.target.value)*Math.PI/180;};
+document.querySelector('#record').onclick=()=>{
+ start=performance.now();const chunks=[],stream=scene.renderer.domElement.captureStream(24);
+ const recorder=new MediaRecorder(stream,{mimeType:'video/webm'});
+ recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+ recorder.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`codex-v41-lock-${corrected?'after':'before'}-${document.querySelector('#view').value}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);stream.getTracks().forEach(t=>t.stop());};
+ recorder.start();setTimeout(()=>recorder.stop(),8000);
+};
+for(const [id,fixed] of [['before',false],['after',true]])document.querySelector('#'+id).onclick=()=>{
+ corrected=fixed;cfg.presence.mimicOnLock=fixed;processor=new SignalProcessor(cfg);fsm=new MimicStateMachine(cfg);start=performance.now();
+};
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ const t=(now-start)/1000,h=.182,phase=t%8;
+ const track={faces:[{bbox:{x:.44,y:.3-h/2,w:.12,h,cx:.5,cy:.3},
+  yaw:20*Math.sin(t),pitch:8*Math.cos(t),roll:0,blend:{},mouth:{open:.12,corner:.02},eyes:{left:.2,right:.2}}],inferenceMs:10};
+ const signal=processor.update(track,now,16/9);
+ const state=fsm.update(signal,now);
+ const p=state.state==='MIMIC'||state.state==='ENTER'?mapSignal(signal,cfg.mapping):NEUTRAL_PARAMS;
+ const lift=phase<2?phase/2:phase<5?1:phase<7?(7-phase)/2:0;
+ ch.setState(state);ch.apply(p,dt,now/1000,standingWavePose(t,lift,1));scene.render();
+ document.querySelector('#status').textContent=
+ `${corrected?'수정':'이전'} | 얼굴 LOCK ${processor.debugFaces[0]?.locked} | 크기 ${signal.bboxH.toFixed(3)} (이전 시작 기준 ${cfg.presence.enterBboxHeight}) | ${state.state} | lift ${lift.toFixed(2)}`;
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

@@ -6,6 +6,7 @@ import {FaceLandmarker, FilesetResolver} from '@mediapipe/tasks-vision';
 import {FaceTracker} from '/src/tracker.ts';
 import {loadConfig} from '/src/config.ts';
 import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
 const file=document.querySelector('#fixture'),status=document.querySelector('#status'),results=document.querySelector('#results');
 document.querySelector('#pipeline').onclick=async()=>{
  try{
@@ -20,11 +21,12 @@ document.querySelector('#pipeline').onclick=async()=>{
  cfg.tracker.wasmPath='/mediapipe/wasm';cfg.tracker.modelPath='/models/face_landmarker.task';
  cfg.presence.lockZone={x:0,y:0,w:1,h:1};
  const tracker=new FaceTracker(cfg.tracker);await tracker.init();
- const signal=new SignalProcessor(cfg);
- let count=0,locked=0,last=null;
+ const signal=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg);
+ let count=0,locked=0,last=null,activeFrames=0;
  for(let i=0;i<90;i++){
  const now=performance.now(),track=tracker.update({readyState:4,currentTime:i/30},now,source);
  const s=signal.update(track,now,source.width/source.height);
+ if(fsm.update(s,now).state==='MIMIC')activeFrames++;
  if(track.faces.length)count++;if(signal.debugFaces.some(f=>f.locked))locked++;
  if(track.faces.length)last=track.faces[0].bbox;
  await new Promise(r=>setTimeout(r,33));
@@ -39,7 +41,7 @@ document.querySelector('#pipeline').onclick=async()=>{
  blankPresent=s.present;
  await new Promise(r=>setTimeout(r,33));
  }
- rows.push({requestedWorker:worker,mode:tracker.mode,detectedFrames:count,lockedFrames:locked,last,blankFaces,blankPresent});
+ rows.push({requestedWorker:worker,mode:tracker.mode,detectedFrames:count,lockedFrames:locked,activeFrames,last,blankFaces,blankPresent});
  tracker.close();status.textContent=JSON.stringify(rows,null,2);
  }
  }catch(e){status.textContent=String(e);throw e;}

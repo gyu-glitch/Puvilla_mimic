@@ -38,19 +38,29 @@ export class FaceRecovery {
       return detect(image, this.lastTimestamp);
     };
     let checkedFull = false;
+    let fullFaces: RawFace[] = [];
     if (!this.crop || now - this.lastFull >= 1000) {
-      const faces = infer(input);
+      fullFaces = infer(input);
       this.lastFull = now;
       checkedFull = true;
-      if (faces.length) {
-        this.crop = null; this.mode = "full";
-        return faces;
+      if (fullFaces.length && !this.crop) {
+        this.mode = "full";
+        return fullFaces;
       }
     }
     if (this.crop) {
       const faces = this.scan(input, this.crop, infer);
-      if (faces.length) return faces;
+      if (faces.length) {
+        // A full-frame face may be a bystander, not the recovered visitor.
+        // Leave target selection to SignalProcessor with both current results.
+        if (fullFaces.length && faces.every(f => fullFaces.some(g => sameFaceBox(f, g)))) {
+          this.crop = null; this.mode = "full";
+          return fullFaces;
+        }
+        return [...faces, ...fullFaces.filter(f => !faces.some(g => sameFaceBox(f, g)))];
+      }
       this.crop = null;
+      if (fullFaces.length) { this.mode = "full"; return fullFaces; }
       if (!checkedFull) {
         const faces = infer(input);
         this.lastFull = now;
@@ -83,6 +93,15 @@ export class FaceRecovery {
     if (faces.length) this.mode = "recovery";
     return faces.map(f => remapRecoveryFace(f, crop, this.width, this.height));
   }
+}
+
+/** Geometric deduplication only; identity/lock association remains downstream. */
+export function sameFaceBox(a: RawFace, b: RawFace): boolean {
+  const p = a.bbox, q = b.bbox;
+  const intersection = Math.max(0, Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)) *
+    Math.max(0, Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y));
+  const union = p.w * p.h + q.w * q.h - intersection;
+  return union > 0 && intersection / union >= 0.35;
 }
 
 export function remapRecoveryFace(face: RawFace, crop: Crop, width: number, height: number): RawFace {

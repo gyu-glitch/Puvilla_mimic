@@ -51,6 +51,8 @@ export interface Config {
     dCutoff: number;
   };
   presence: {
+    /** 락온 영역에서 얼굴을 잡으면 거리 문턱 없이 미믹 시작. */
+    mimicOnLock: boolean;
     /** 얼굴 높이 / 입력 영상의 짧은 변. 가로 입력에서는 기존 화면 높이 비율과 같다. */
     enterBboxHeight: number;
     exitBboxHeight: number;
@@ -449,6 +451,7 @@ export const DEFAULT_CONFIG: Config = {
   },
   smoothing: { headMinCutoff: 1.0, headBeta: 0.05, blendMinCutoff: 1.5, blendBeta: 0.1, blinkMinCutoff: 6, dCutoff: 1.0 },
   presence: {
+    mimicOnLock: true,
     enterBboxHeight: 0.22,
     exitBboxHeight: 0.15,
     centerToleranceX: 0.35,
