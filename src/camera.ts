@@ -3,7 +3,11 @@ import { log } from "./logger";
 
 /** 현재 열린 스트림 — 페이지를 닫거나 새로고침할 때 확실히 놓아 준다 (안 놓으면 다음 로드에서 NotReadableError) */
 let current: MediaStream | null = null;
+const imageRetryTimers = new Set<ReturnType<typeof setTimeout>>();
+const imageRequests = new WeakMap<MediaStreamTrack, Promise<void>>();
 const release = () => {
+  for (const timer of imageRetryTimers) clearTimeout(timer);
+  imageRetryTimers.clear();
   current?.getTracks().forEach((t) => t.stop());
   current = null;
 };
@@ -17,24 +21,38 @@ export function currentVideoTrack(): MediaStreamTrack | null {
   return current?.getVideoTracks()[0] ?? null;
 }
 
-/** 저장된 노출·밝기 설정을 트랙에 적용 (지원 안 하는 항목은 건너뜀) */
+/** 자동노출은 항상 명시적으로 적용. 기기별 수치는 사용자가 저장한 경우에만 적용한다. */
 export async function applyImageSettings(cfg: Config["camera"]): Promise<void> {
   const track = currentVideoTrack();
   if (!track?.getCapabilities) return;
-  const caps = track.getCapabilities() as Record<string, unknown>;
-  const adv: Record<string, unknown> = {};
-  if (caps.exposureMode && caps.exposureTime && !cfg.autoExposure) {
-    adv.exposureMode = "manual";
-    adv.exposureTime = cfg.exposureTime;
-  } else if (caps.exposureMode) adv.exposureMode = "continuous";
-  if (caps.exposureCompensation && cfg.autoExposure) adv.exposureCompensation = cfg.exposureCompensation;
-  if (caps.brightness) adv.brightness = cfg.brightness;
-  if (caps.contrast) adv.contrast = cfg.contrast;
-  try {
-    await track.applyConstraints({ advanced: [adv as MediaTrackConstraintSet] });
-  } catch (e) {
-    log.warn("camera", `노출 설정 적용 실패: ${String(e)}`);
-  }
+  const settings = { ...cfg };
+  const isActive = () => track === currentVideoTrack() && track.readyState !== "ended";
+  // UI changes and driver warm-up retries must reach this track in request order.
+  const request = (imageRequests.get(track) ?? Promise.resolve()).then(async () => {
+    if (!isActive()) return;
+    try {
+      const caps = track.getCapabilities() as Record<string, unknown>;
+      const modes = Array.isArray(caps.exposureMode) ? caps.exposureMode : [];
+      const manual = settings.applyImageSettings && !settings.autoExposure &&
+        modes.includes("manual") && !!caps.exposureTime;
+      const mode = manual ? "manual" : modes.includes("continuous") ? "continuous" : null;
+      // Keep mode separate: an unsupported saved brightness must not cancel auto exposure.
+      if (mode) await track.applyConstraints({
+        advanced: [{ exposureMode: mode } as MediaTrackConstraintSet],
+      });
+      if (!isActive() || !settings.applyImageSettings) return;
+      const adv: Record<string, unknown> = {};
+      if (manual) adv.exposureTime = settings.exposureTime;
+      if (caps.exposureCompensation && mode === "continuous") adv.exposureCompensation = settings.exposureCompensation;
+      if (caps.brightness) adv.brightness = settings.brightness;
+      if (caps.contrast) adv.contrast = settings.contrast;
+      if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv as MediaTrackConstraintSet] });
+    } catch (e) {
+      log.warn("camera", `노출 설정 적용 실패: ${String(e)}`);
+    }
+  });
+  imageRequests.set(track, request);
+  await request;
 }
 
 /** 사람이 읽을 수 있는 원인 설명 */
@@ -108,9 +126,13 @@ export async function openCamera(
   const s = stream.getVideoTracks()[0]?.getSettings();
   log.info("camera", `open ${s?.width}x${s?.height}@${s?.frameRate} label="${stream.getVideoTracks()[0]?.label}"`);
   // 막 켜진 직후엔 드라이버가 노출 설정을 무시하는 일이 있어(Windows) 조금 뒤 몇 번 더 적용
-  if (cfg.applyImageSettings) {
-    await applyImageSettings(cfg);
-    for (const ms of [500, 1500, 3000]) setTimeout(() => void applyImageSettings(cfg), ms);
+  await applyImageSettings(cfg);
+  for (const ms of [500, 1500, 3000]) {
+    const timer = setTimeout(() => {
+      imageRetryTimers.delete(timer);
+      if (current === stream) void applyImageSettings(cfg);
+    }, ms);
+    imageRetryTimers.add(timer);
   }
 
   // 케이블이 빠지는 등 트랙이 끝나면 상위에서 복구하도록 이벤트를 띄운다

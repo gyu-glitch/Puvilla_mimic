@@ -12,7 +12,7 @@ export interface Config {
     height: number;
     frameRate: number;
     mirror: boolean;
-    /** 아래 노출·밝기 값을 카메라에 적용할지 (false = 카메라 기본값 그대로) */
+    /** 기기별 노출·밝기 수치를 적용할지 (false = 자동노출만 명시 적용, 나머지는 기기 기본값) */
     applyImageSettings: boolean;
     /** true = 자동 노출(보정값만 조정) / false = 수동 노출 시간 */
     autoExposure: boolean;
