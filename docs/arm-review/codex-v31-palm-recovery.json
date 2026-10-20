@@ -1,0 +1,41 @@
+{
+  "rows": [
+    {
+      "fps": 15,
+      "sign": -1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    },
+    {
+      "fps": 15,
+      "sign": 1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    },
+    {
+      "fps": 30,
+      "sign": -1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    },
+    {
+      "fps": 30,
+      "sign": 1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    },
+    {
+      "fps": 60,
+      "sign": -1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    },
+    {
+      "fps": 60,
+      "sign": 1,
+      "beforeRecoveryDegrees": 74.48451336700703,
+      "afterRecoveryDegrees": 0
+    }
+  ],
+  "realTurnAndAmbiguousRelease": "pass"
+}

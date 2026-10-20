@@ -140,3 +140,11 @@
 - 사용자 명시 승인으로 v29를 공개 https://nau-gyuchan.tailc22fe0.ts.net/ 에 반영했다. 공개 current.txt=codex-promoted-20261020-094057, 실제 config.build=codex-20261020-094057. 원본 빌드와 current.before-codex-v29.txt 복구 포인터 보존.
 - 이후 개발은 계속 https://nau-gyuchan.tailc22fe0.ts.net:10000/ 및 pubilla-mimic-codex 에서 진행한다. 별도 승인 없이 추가 개발 결과를 공개로 자동 승격하지 않는다.
 - v30 시작: 부분 웨이트 경계42개 edge에서 DQS/rounded 전환 길이 차이를 계측했다. 깊은 굽힘의 특정 edge에서1.095배→1.304배 차이가 발견돼 주변 면의 실제 렌더 대조가 다음 단계다. probe-arm-transition.mjs / codex-v30-transition-diagnostic.json 참조.
+
+## v31 손바닥 비틀림 고정 해제 / 공개 반영
+
+- 최신 공개/개발 build **codex-20261020-101333**. 공개 카메라 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-101333 . 개발 https://nau-gyuchan.tailc22fe0.ts.net:10000/ .
+- 손바닥 상대각에 누적 unwrap을 적용해 ±π 검출 반전 뒤 정상0 입력에서도 ±1.3rad 비틀림이 남던 오류를 수정했다. 주각 범위에서 직접 추적하며 절댓값1.5rad 초과는 불확실 면으로 취급한다. 이전 유효값180ms 유지 후 정면으로 완만하게 복귀한다. 정상 ±1.3rad 이내 회전은 유지한다. 손등을 완전히 뒤집는 회전은 지원하지 않는다.
+- 같은 합성 팔 자세/한쪽 손 면 반전의 전후12초를 세 방향에서 비교했다. 정면에서 한쪽 손날이 남던 오류가 줄었다. 기본 유화 인사 세 방향도 확인했다. 단위/전체 리그/타입 검사 통과, 공개 렌더 오류0. 실카메라 모든 비틀림과 팔 형태를 해결했다는 의미는 아니다.
+- 사용자의 즉시 공개 승격 지시에 따라 별도 공개 릴리스 codex-promoted-20261020-101333로 반영했다. 이전 v29와 current.before-codex-v31.txt 복구 포인터 보존. v30 어깨 후보는 미배포 stash로 보류했다.
+- 다음은 내린 오른팔이 불확실 검출에서 들리는 문제를 개발용에서 재현/수정한다. 상세 증거/제한/릴리스 기록은 CONTINUOUS_REVIEW.md v31 참조.

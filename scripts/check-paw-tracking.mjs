@@ -14,8 +14,8 @@ assert.ok(oldMax-oldMin>.1,'fixture did not reproduce dropout wobble');assert.ok
 assert.ok(Math.abs(p.wrist.z-.12)<1e-9);
 for(let i=180;i<300;i++)p.update(null,null,i/60,1/60);
 assert.ok(Math.abs(p.roll)<.01 && p.wrist.length()<.002,'sustained loss did not return to neutral');
-p.reset();p.update(Math.PI-.01,w,0,1/60);p.update(-Math.PI+.01,w,.02,1/60);assert.equal(p.roll,1.3,'wrapped angle flipped the paw');
-p.reset();p.update(-Math.PI+.01,w,0,1/60);p.update(Math.PI-.01,w,.02,1/60);assert.equal(p.roll,-1.3,'mirrored wrapped angle flipped the paw');
+p.reset();p.update(Math.PI-.01,w,0,1/60);p.update(-Math.PI+.01,w,.02,1/60);assert.equal(p.roll,0,'flipped plane created a saturated palm command');
+p.reset();p.update(-Math.PI+.01,w,0,1/60);p.update(Math.PI-.01,w,.02,1/60);assert.equal(p.roll,0,'mirrored flipped plane created a saturated palm command');
 p.update(0,new Vector3(0,0,10),2,1/60);assert.equal(p.roll,0);assert.ok(Math.abs(p.wrist.length()-.18)<1e-9);
 p.update(NaN,new Vector3(NaN,0,0),2.1,1/60);assert.ok(Number.isFinite(p.roll)&&p.wrist.toArray().every(Number.isFinite));
 p.reset();assert.equal(p.roll,0);assert.equal(p.wrist.length(),0);

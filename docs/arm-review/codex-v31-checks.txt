@@ -1,0 +1,509 @@
+
+> pubilla-mimic-codex@0.1.0 rig:check
+> node --experimental-transform-types scripts/check-standing-rig.mjs && node --experimental-transform-types scripts/check-arm-tracking.mjs && node --experimental-transform-types scripts/check-arm-jitter.mjs && node --experimental-transform-types scripts/check-body-session.mjs && node --experimental-transform-types scripts/check-arm-camera-frame.mjs && node --experimental-transform-types scripts/check-arm-image-alignment.mjs && node --experimental-transform-types scripts/check-subdivision-plan.mjs && node --experimental-transform-types scripts/check-cage-surface.mjs && node --experimental-transform-types scripts/check-head-clearance.mjs && node --experimental-transform-types scripts/check-head-contact-motion.mjs && node --experimental-transform-types scripts/check-paw-tracking.mjs && node --experimental-transform-types scripts/check-arm-azimuth.mjs && node --experimental-transform-types scripts/check-bend-frame.mjs && node --experimental-transform-types scripts/check-torso-clearance.mjs && node --experimental-transform-types scripts/check-torso-motion.mjs && node --experimental-transform-types scripts/check-paw-contact.mjs && node --experimental-transform-types scripts/check-elbow-plane.mjs && node --experimental-transform-types scripts/check-upper-clearance.mjs && node --experimental-transform-types scripts/check-upper-contact-motion.mjs && node --experimental-transform-types scripts/check-paw-frame.mjs && node --experimental-transform-types scripts/check-independent-palm.mjs && node --experimental-transform-types scripts/check-follow-pose.mjs && node --experimental-transform-types scripts/check-cage-surface.mjs --rig=public/models/stand_connected_cage_mirrorleft.json && node --experimental-transform-types scripts/probe-arm-symmetry.mjs public/models/stand_connected_cage_mirrorleft.json
+
+PASS: 1372 torso anchors; rigid-paw greeting with settled upper arm, quiet pause and smooth cycle boundaries; mirrored tracking and invalid palm fallback.
+PASS: original body/scarf hashes; 964 fixed torso/head vertices; 432 fully weighted arm vertices; symmetric joints; mirrored tracking; independent occlusion release; NaN recovery; face/body association.
+(node:112468) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  oldUncertainFramesAccepted: 315,
+  newUncertainFramesAccepted: 0,
+  reliableOtherArmFrames: 315
+}
+PASS: independent rest, stable reacquisition at 15/30/60Hz, missing body, frame skips, stall, off-screen wrist, collapsed bone and clean filter recovery.
+(node:2908) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  oldConfidenceTransitions: 31,
+  newConfidenceTransitions: 0,
+  oldBoundaryJumpDeg: 29.25758274533794,
+  newBoundaryJumpDeg: 0.0028954780052302953,
+  oldTorsoJumpDeg: 30.256437163529277,
+  newTorsoJumpDeg: 0.09413549184492329
+}
+(node:94892) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[10:06:18.371] [state] IDLE → ENTER
+[10:06:18.373] [state] IDLE → ENTER
+[10:06:18.375] [state] ENTER → MIMIC
+[10:06:18.375] [state] ENTER → MIMIC
+[10:06:18.381] [state] MIMIC → EXIT
+[10:06:18.384] [state] EXIT → IDLE
+[10:06:18.390] [state] IDLE → ATTRACT
+[10:06:18.398] [state] MIMIC → EXIT
+[10:06:18.398] [state] EXIT → IDLE
+{
+  oldDroppedAt: 3500,
+  oldExitAt: 5000,
+  continuousBodyHeldSeconds: 30,
+  oldSteadyConfidenceFramesRejected: 503
+}
+(node:128392) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  oldMaxForearmDirectionErrorDeg: 4.2907537556667865,
+  newMaxForearmDirectionErrorDeg: 0
+}
+(node:117388) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  oldBilateralForearmDifferenceDeg: 28.878099273568008,
+  newBilateralForearmDifferenceDeg: 0
+}
+(node:105112) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:111612) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Subdivision plan matches original evaluator: moving body, boundary, two levels.
+{
+  active: 11194,
+  maxPosition: 0,
+  maxNormal: 0,
+  transformError: 0,
+  cpuMilliseconds: 14.586999999999989
+}
+Rounded cage: large bend/roll finite, distal paw distances preserved.
+(node:119196) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  worstBefore: 0.48219687644878784,
+  worstAfter: 0.9428040851836319,
+  maxCorrection: 0.6500000000000005,
+  maxStep: 0.023131077045865377,
+  affected: 664,
+  worstCase: {
+    side: -1,
+    time: 20.1,
+    before: 0.8489206921386009,
+    after: 0.9428040851836319,
+    correction: 0.6499999999999998
+  }
+}
+(node:128820) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  targetOnly: { minimum: 0.9593755491950801, maxStep: 0.06871592152293463 },
+  contact: { minimum: 0.9780349341014645, maxStep: 0.08790266179284159 }
+}
+(node:81856) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:115912) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  dropoutRollRangeBefore: 0.5226088688133248,
+  dropoutRollRangeAfter: 2.2200665861227264e-8,
+  wrapAndExpiry: 'pass'
+}
+(node:116964) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  crossBodyBeforeDeg: 142.48905834396146,
+  crossBodyAfterDeg: 0.10996460760297012,
+  wholeCircleMaxStepDeg: 0.1271566336056616
+}
+(node:128180) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  samples: 15360,
+  maxErrorCm: 2.1390168887322673e-14,
+  oldMedianMs: 1.0588999999999942,
+  cachedMedianMs: 0.3872999999999962,
+  oldP95Ms: 1.4474000000000018,
+  cachedP95Ms: 0.518100000000004,
+  checksumFinite: true
+}
+{
+  worstBefore: 0.10155710391389447,
+  worstAfter: 1.014763722168248,
+  maxCorrection: 1.898357043934495,
+  maxStep: 0.034165148465250844,
+  affected: 2272,
+  worstCase: {
+    side: 1,
+    time: 14.76,
+    before: 0.9962959410879335,
+    after: 1.014763722168248,
+    correction: 0.05117498908595704
+  },
+  stepCase: {
+    side: -1,
+    t: 0.01,
+    upper: [ -0.8168193095067455, -0.5767947926800772, -0.010676270606832388 ],
+    mapped: [ 0.2544474138759724, -0.9670698093828656, -0.0057006448773606515 ],
+    before: 0.9666120258525248,
+    after: 1.0149998467286316
+  }
+}
+(node:129400) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[
+  {
+    movingChest: false,
+    fps: 15,
+    minimum: 1.0138260689113503,
+    maxStep: 0.11321338970747971
+  },
+  {
+    movingChest: false,
+    fps: 30,
+    minimum: 1.01422859813608,
+    maxStep: 0.06805589943001945
+  },
+  {
+    movingChest: false,
+    fps: 60,
+    minimum: 1.014442237207657,
+    maxStep: 0.03171525573582508
+  },
+  {
+    movingChest: false,
+    fps: 100,
+    minimum: 1.014458493530602,
+    maxStep: 0.01869921510663259
+  },
+  {
+    movingChest: true,
+    fps: 15,
+    minimum: 1.0112971963069404,
+    maxStep: 0.17494912194385195
+  },
+  {
+    movingChest: true,
+    fps: 30,
+    minimum: 1.010354135758559,
+    maxStep: 0.11377689333617302
+  },
+  {
+    movingChest: true,
+    fps: 60,
+    minimum: 1.0095901844966972,
+    maxStep: 0.05721813391826974
+  },
+  {
+    movingChest: true,
+    fps: 100,
+    minimum: 1.0092530676718745,
+    maxStep: 0.034275309950064566
+  }
+]
+(node:81208) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  fps: 15,
+  minimumBefore: 0.0685554851595711,
+  minimumAfter: 17.94223088926875,
+  maxStep: 0.06654841650902545,
+  maxCorrection: 0.5032030427801996
+}
+{
+  fps: 30,
+  minimumBefore: 0.020756300179350262,
+  minimumAfter: 17.93517932773728,
+  maxStep: 0.03400602501540964,
+  maxCorrection: 0.498335503321823
+}
+{
+  fps: 60,
+  minimumBefore: 0.0019655190567604564,
+  minimumAfter: 17.931310275243654,
+  maxStep: 0.017746020691559807,
+  maxCorrection: 0.4932760246963791
+}
+(node:115708) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  oldJump: 2.4,
+  newJump: 0,
+  releaseJump: 0.06793826403875657,
+  normalError: 2.1073424255447017e-8
+}
+(node:95796) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  beforeMin: 0.42402927213394176,
+  afterMin: 1.014999844778311,
+  maxCorrection: 0.6383461760586396,
+  maxStep: 0.01083739815142102,
+  worst: {
+    side: -1,
+    t: 1.76,
+    before: 0.9425162457301588,
+    after: 1.014999844778311,
+    correction: 0.07262233971077503
+  },
+  beforeWorst: {
+    side: 1,
+    t: 2.48,
+    theta: 2.5747517313610495,
+    phi: 1.9837351998348616,
+    before: 0.42402927213394176,
+    after: 1.014999953902515
+  }
+}
+(node:119352) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[
+  {
+    fps: 15,
+    whole: false,
+    minimum: 0.25700192073224104,
+    maxStep: 0.634548448641743
+  },
+  {
+    fps: 15,
+    whole: true,
+    minimum: 0.9603905310314444,
+    maxStep: 0.3000000000000005
+  },
+  {
+    fps: 30,
+    whole: false,
+    minimum: 0.2566130717193013,
+    maxStep: 0.3429782399284981
+  },
+  { fps: 30, whole: true, minimum: 0.9703496349339296, maxStep: 0.2 },
+  {
+    fps: 60,
+    whole: false,
+    minimum: 0.2525104224070762,
+    maxStep: 0.16308706099378575
+  },
+  {
+    fps: 60,
+    whole: true,
+    minimum: 0.9501788176274687,
+    maxStep: 0.10000000000000168
+  }
+]
+(node:126752) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:124972) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[
+  {
+    side: -1,
+    phi: 1.57,
+    theta: 1.5,
+    beforeDeg: 136.51351472963893,
+    afterDeg: 0,
+    correction: -2.382610305501976
+  },
+  {
+    side: -1,
+    phi: 1.57,
+    theta: 2,
+    beforeDeg: 120.17279987832396,
+    afterDeg: 0,
+    correction: -2.0974110292169934
+  },
+  {
+    side: -1,
+    phi: 1.57,
+    theta: 2.5,
+    beforeDeg: 86.82268846599302,
+    afterDeg: 0,
+    correction: -1.515341779164883
+  },
+  {
+    side: 1,
+    phi: 1.57,
+    theta: 1.5,
+    beforeDeg: 136.51351472963893,
+    afterDeg: 0,
+    correction: 2.382610305501976
+  },
+  {
+    side: 1,
+    phi: 1.57,
+    theta: 2,
+    beforeDeg: 120.17279987832396,
+    afterDeg: 0,
+    correction: 2.0974110292169934
+  },
+  {
+    side: 1,
+    phi: 1.57,
+    theta: 2.5,
+    beforeDeg: 86.82268846599302,
+    afterDeg: 0,
+    correction: 1.515341779164883
+  }
+]
+{
+  samples: 24,
+  maxBeforeDegrees: 136.51351472963893,
+  maxAfterDegrees: 0,
+  maxCorrection: 2.382610305501976
+}
+[
+  { time: 3, side: -1, legacy: false, errorDeg: 0 },
+  { time: 3, side: -1, legacy: true, errorDeg: 0.5435637775113374 },
+  { time: 3, side: 1, legacy: false, errorDeg: 0 },
+  { time: 3, side: 1, legacy: true, errorDeg: 0.5435637775113374 },
+  { time: 5, side: -1, legacy: false, errorDeg: 0 },
+  { time: 5, side: -1, legacy: true, errorDeg: 1.2909672524112454 },
+  { time: 5, side: 1, legacy: false, errorDeg: 0 },
+  { time: 5, side: 1, legacy: true, errorDeg: 1.2909672524112454 },
+  { time: 6, side: -1, legacy: false, errorDeg: 0 },
+  { time: 6, side: -1, legacy: true, errorDeg: 7.766375152499387 },
+  { time: 6, side: 1, legacy: false, errorDeg: 0 },
+  { time: 6, side: 1, legacy: true, errorDeg: 7.766375152499387 },
+  { time: 8, side: -1, legacy: false, errorDeg: 0 },
+  { time: 8, side: -1, legacy: true, errorDeg: 15.522467657586338 },
+  { time: 8, side: 1, legacy: false, errorDeg: 0 },
+  { time: 8, side: 1, legacy: true, errorDeg: 15.522467657586338 },
+  { time: 11, side: -1, legacy: false, errorDeg: 0 },
+  { time: 11, side: -1, legacy: true, errorDeg: 7.766375152499387 },
+  { time: 11, side: 1, legacy: false, errorDeg: 0 },
+  { time: 11, side: 1, legacy: true, errorDeg: 7.766375152499387 }
+]
+{ oldPalmPlaneErrorDeg: 15.522467657586338, newPalmPlaneErrorDeg: 0 }
+(node:89748) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  maxRaisedError: 1.5700924586837752e-16,
+  maxElevationError: 5.435422112398669e-9,
+  maxBendError: 1.2082882559085424,
+  affected: 1806,
+  unresolved: 937,
+  minBefore: 0.048434358773751,
+  minAfter: 0.9870118855835073,
+  maxStep: 0.06391401655179255,
+  dynamicMinimum: 0.9870118855835073
+}
+(node:129208) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  active: 11194,
+  maxPosition: 0,
+  maxNormal: 0,
+  transformError: 0,
+  cpuMilliseconds: 6.74980000000005
+}
+Rounded cage: large bend/roll finite, distal paw distances preserved.
+(node:80848) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{ processorError: 0, upperError: 0, foreError: 0, pawError: 0 }
+{
+  turn: 0,
+  matched: 263,
+  worst: [
+    {
+      i: 1619,
+      j: 699,
+      rest: 0.027914281613540082,
+      posed: 0.041944611478931706
+    },
+    {
+      i: 1393,
+      j: 474,
+      rest: 0.027227778701175216,
+      posed: 0.02722777870122182
+    },
+    {
+      i: 1340,
+      j: 413,
+      rest: 0.025423441525481868,
+      posed: 0.02673028425886776
+    },
+    {
+      i: 1613,
+      j: 693,
+      rest: 0.013575861372314488,
+      posed: 0.02508834165156411
+    }
+  ]
+}
+{
+  turn: 0.5,
+  matched: 263,
+  worst: [
+    {
+      i: 1619,
+      j: 699,
+      rest: 0.027914281613540082,
+      posed: 0.041944611478931706
+    },
+    {
+      i: 1393,
+      j: 474,
+      rest: 0.027227778701175216,
+      posed: 0.02722777870120708
+    },
+    {
+      i: 1340,
+      j: 413,
+      rest: 0.025423441525481868,
+      posed: 0.02673028425886776
+    },
+    {
+      i: 1613,
+      j: 693,
+      rest: 0.013575861372314488,
+      posed: 0.02508834165156411
+    }
+  ]
+}
+{
+  turn: 1.5,
+  matched: 263,
+  worst: [
+    {
+      i: 1619,
+      j: 699,
+      rest: 0.027914281613540082,
+      posed: 0.041944611478931706
+    },
+    {
+      i: 1393,
+      j: 474,
+      rest: 0.027227778701175216,
+      posed: 0.02722777870120494
+    },
+    {
+      i: 1340,
+      j: 413,
+      rest: 0.025423441525481868,
+      posed: 0.02673028425886776
+    },
+    {
+      i: 1613,
+      j: 693,
+      rest: 0.013575861372314488,
+      posed: 0.02508834165156411
+    }
+  ]
+}
+{
+  turn: 2.5,
+  matched: 263,
+  worst: [
+    {
+      i: 1619,
+      j: 699,
+      rest: 0.027914281613540082,
+      posed: 0.041944611478931706
+    },
+    {
+      i: 1393,
+      j: 474,
+      rest: 0.027227778701175216,
+      posed: 0.02722777870118642
+    },
+    {
+      i: 1340,
+      j: 413,
+      rest: 0.025423441525481868,
+      posed: 0.02673028425886776
+    },
+    {
+      i: 1613,
+      j: 693,
+      rest: 0.013575861372314488,
+      posed: 0.02508834165156411
+    }
+  ]
+}
+(node:45532) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
