@@ -27,11 +27,33 @@ rig.weights.forEach((w,i)=>{
 assert.ok(arms>300);assert.ok(torso>400);
 assert.equal(rig.corrective.length,rig.rest.length);
 rig.corrective.forEach((d,i)=>{
- assert.ok(d.every(Number.isFinite)&&Math.hypot(...d)<10,'socket corrective must remain bounded');
+ assert.ok(d.every(Number.isFinite)&&Math.hypot(...d)<5.1,'socket corrective must remain localized');
  const [x,y]=rig.rest[i];
  if(y>=119||Math.abs(x)<=15||rig.weights[i][0]+rig.weights[i][1]===0)
   assert.deepEqual(d,[0,0,0],'socket correction reached protected source vertices');
 });
+const {Vector3}=await import('three');
+const {standingUpperDirection}=await import('../src/character/standingArmPose.ts');
+for(const side of [1,-1]){
+ const j=rig.joints[side>0?'L':'R'];
+ const s=new Vector3(...j.shoulder),axis=new Vector3(...j.hand).sub(s),length=axis.length();axis.normalize();
+ assert.ok(standingUpperDirection(side,axis,new Vector3(0,-1,0),3).distanceTo(axis)<1e-10,
+  'lowered input must recover the official model neutral axis, including depth');
+ rig.corrective.forEach((d,i)=>{
+  if(rig.rest[i][0]*side<0)return;
+  if(new Vector3(...rig.rest[i]).sub(s).dot(axis)/length>=.48)
+   assert.deepEqual(d,[0,0,0],'shoulder correction changed the forearm or hand proportions');
+ });
+ let previous;
+ for(let theta=0;theta<=3;theta+=.005){
+  const human=new Vector3(side*Math.sin(theta),-Math.cos(theta),0);
+  const mapped=standingUpperDirection(side,axis,human,3);
+  assert.ok(Math.abs(mapped.length()-1)<1e-10,'retargeting scaled the arm');
+  if(theta>=Math.PI/2)assert.ok(mapped.distanceTo(human)<1e-10,'raised input must follow the observed direction');
+  if(previous)assert.ok(mapped.distanceTo(previous)<.006,'neutral-to-raised mapping has a discontinuity');
+  previous=mapped;
+ }
+}
 for(const joint of ['shoulder','elbow','hand']){
  assert.equal(rig.joints.L[joint][0],-rig.joints.R[joint][0]);
  assert.deepEqual(rig.joints.L[joint].slice(1),rig.joints.R[joint].slice(1));

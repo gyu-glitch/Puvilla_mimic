@@ -52,7 +52,7 @@ document.querySelector('#capture').addEventListener('click',async()=>{
  scene.render();const src=controls.look.value==='final'?document.querySelector('#app + canvas'):scene.renderer.domElement,out=document.createElement('canvas');out.width=src.width;out.height=src.height;
  const ctx=out.getContext('2d'),bg=ctx.createLinearGradient(0,0,0,out.height);bg.addColorStop(0,cfg.scene.bgTop);bg.addColorStop(1,cfg.scene.bgBottom);
  ctx.fillStyle=bg;ctx.fillRect(0,0,out.width,out.height);if(backdrop)ctx.drawImage(backdrop.canvas,0,0,out.width,out.height);ctx.drawImage(src,0,0);
- const name=`codex-v3-arm-${cfg.body.armRig}-${controls.pose.value}-${controls.view.value}`;
+ const name=`codex-v4-arm-${cfg.body.armRig}-${controls.pose.value}-${controls.view.value}`;
  const response=await fetch('/__mimic/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data:out.toDataURL('image/png')})});
  document.querySelector('#capture').textContent=response.ok?'PNG 기록 완료':'저장 실패';
 });
@@ -68,7 +68,7 @@ document.querySelector('#record').addEventListener('click',()=>{
   recordEpoch=null;
   stream.getTracks().forEach(track=>track.stop());
   const data=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(new Blob(chunks,{type:'video/webm'}));});
-  const name=`codex-v3-${controls.pose.value}-${controls.view.value}`;
+  const name=`codex-v4-${controls.pose.value}-${controls.view.value}`;
   const response=await fetch('/__mimic/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})});
   button.textContent=response.ok?'영상 기록 완료':'영상 저장 실패';button.disabled=false;
  };

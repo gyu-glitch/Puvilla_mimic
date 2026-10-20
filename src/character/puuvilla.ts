@@ -11,6 +11,7 @@ import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, 
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
 import { StandingArmSurface } from "./standingArmSurface";
 import { standingWaveMotion } from "../standingWave";
+import { standingUpperDirection } from "./standingArmPose";
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -1000,8 +1001,7 @@ export class PuuvillaCharacter implements CharacterRig {
         _qIdle.setFromUnitVectors(arm.restUpper, polarDir(arm.side, fa.freeArmIdleTheta, fa.freeArmIdlePhi));
         _qIdleF.setFromAxisAngle(_n.set(1, 0, 0), -fa.freeArmIdleElbow);
       } else {
-        if(this.connectedArms)_qIdle.setFromUnitVectors(arm.restUpper,polarDir(arm.side,.43,0));
-        else _qIdle.identity();
+        _qIdle.identity();
         _qIdleF.identity();
       }
       if (pose && conf >= this.cfg.body.minVisibility) {
@@ -1054,8 +1054,7 @@ export class PuuvillaCharacter implements CharacterRig {
         const i = arm.side > 0 ? 0 : 1;
         const direction = arm.restFore.clone().applyQuaternion(arm.qFore).applyQuaternion(arm.qUpper);
         const raised = smooth(-.35, .65, direction.y);
-        // Roll the original paw so its thumb faces inward when raised. Spread
-        // the distal paw gently; the neutral model is bit-for-bit unchanged.
+        // Roll the supplied paw without scaling its width or length.
         let target = arm.side * (this.debugPawTurn ?? -Math.PI/2) * raised;
         const across=pose && conf>=this.cfg.body.minVisibility ? (arm.side>0?pose.handAcrossL:pose.handAcrossR) : undefined;
         if(across && this.debugPawTurn===null){
@@ -1075,13 +1074,10 @@ export class PuuvillaCharacter implements CharacterRig {
         }
         const current = this.armSurface.turn.value.getComponent(i);
         this.armSurface.turn.value.setComponent(i, current + (target-current)*k);
-        this.armSurface.spread.value.setComponent(i, .12*raised);
-        this.armSurface.pawShorten.value.setComponent(i, .24*raised);
         const upperY=arm.restUpper.clone().applyQuaternion(arm.qUpper).y;
-        this.armSurface.shoulderShape.value.setComponent(i,.43*smooth(-.35,.70,upperY));
+        this.armSurface.socketActivation.value.setComponent(i,smooth(-.35,.70,upperY));
         const reference=new THREE.Quaternion().setFromUnitVectors(arm.restUpper,polarDir(arm.side,2.32,.08));
-        this.armSurface.bodyRotation.value.multiplyQuaternions(spine.quaternion,chest.quaternion);
-        this.armSurface.correctiveRotation.value[i].copy(this.armSurface.bodyRotation.value).multiply(arm.qUpper).multiply(reference.invert());
+        this.armSurface.correctiveRotation.value[i].multiplyQuaternions(spine.quaternion,chest.quaternion).multiply(arm.qUpper).multiply(reference.invert());
         const handDirection=pose && conf>=this.cfg.body.minVisibility
           ? (arm.side>0?pose.handDirectionL:pose.handDirectionR) : undefined;
         const wristTarget=new THREE.Vector3();
@@ -1214,14 +1210,13 @@ export class PuuvillaCharacter implements CharacterRig {
     const theta = Math.acos(clamp(-tu.y, 1));
     let phi = Math.atan2(tu.z, arm.side * tu.x);
     phi = Math.min(2.0, Math.max(-0.5, phi)) * smooth(0.25, 0.7, theta);
-    // Connected standing arms keep a small body-clearance angle when lowered.
-    // Above horizontal they follow the measured direction without compression.
+    // Preserve the official neutral axis; raised input follows the person.
     const theta2 = this.armsFree
       ? Math.min(this.cfg.character.freeArmRaiseMaxRad, theta)
-      : this.connectedArms
-        ? Math.min(this.cfg.body.armRaiseMaxRad, theta + .43 * (1 - smooth(0, Math.PI / 2, theta)))
       : Math.min(this.cfg.body.armRaiseMaxRad, arm.restPolar + (theta * (Math.PI - arm.restPolar)) / Math.PI);
-    const d = polarDir(arm.side, theta2, phi);
+    const d = this.connectedArms
+      ? standingUpperDirection(arm.side,arm.restUpper,tu,this.cfg.body.armRaiseMaxRad)
+      : polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);
 
     // 팔꿈치: 사람의 굽힘각/굽힘축을 위팔 매핑과 같은 회전으로 옮김

@@ -8,3 +8,4 @@ public/mediapipe/wasm/
 release/
 dist-next/
 dist-old/
+tmp/

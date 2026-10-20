@@ -20,9 +20,7 @@ export function socketCorrective(P, neighbors, weights, joints) {
   const offset=v(p).sub(s),d=offset.dot(axis),t=d/length;
   region[i]=smooth(.005,.18,mask)*(1-smooth(.18,.48,t));
   if(p[1]>=119||Math.abs(p[0])<=15)region[i]=0;
-  const shape=.43*smooth(-.18,.06,t)*(1-smooth(.22,.58,t))*mask;
-  const width=new T.Vector3().crossVectors(axis,new T.Vector3(0,0,1)).normalize(),depth=new T.Vector3().crossVectors(width,axis);
-  const radial=width.multiplyScalar(offset.dot(width)*(1-shape*.4)).add(depth.multiplyScalar(offset.dot(depth)*(1-shape)));
+  const radial=offset.clone().addScaledVector(axis,-d);
   radial.applyAxisAngle(axis,side*(-Math.PI/2)*smooth(.3,.84,t)*mask);
   const point=s.clone().addScaledVector(axis,d).add(radial);
   const neck=smooth(112,131,p[1]),wa=mask*(1-neck),wf=weights[i][2]*(1-neck),w=[1-wa,wa-wf,wf];
@@ -32,16 +30,19 @@ export function socketCorrective(P, neighbors, weights, joints) {
   const dot=qr.reduce((sum,x,k)=>sum+x*qd[k],0);for(let k=0;k<4;k++)qd[k]-=qr[k]*dot;
   const rotation=new T.Quaternion(...qr),translation=new T.Quaternion(...qd).multiply(rotation.clone().conjugate());
   point.applyQuaternion(rotation).add(new T.Vector3(translation.x,translation.y,translation.z).multiplyScalar(2));
-  point.y+=7.5*mask*smooth(-.25,0,t)*(1-smooth(.03,.40,t));
   return point;
  });
  let fair=posed.map(p=>p.clone());
- for(let pass=0;pass<28;pass++){
+ // Alternating fairing passes avoid the systematic shrinkage of repeatedly
+ // averaging the joint. Eight short finishing passes soften the residual fold
+ // at the socket only. All hand and central torso vertices remain anchored.
+ for(let pass=0;pass<48;pass++){
   fair=fair.map((p,i)=>{
    if(region[i]===0)return p;
    const average=new T.Vector3();let sum=0;
    for(const [j,d] of neighbors[i]){const weight=1/Math.max(1,d);average.addScaledVector(fair[j],weight);sum+=weight;}
-   return p.clone().lerp(average.divideScalar(sum),.48*region[i]);
+   const relaxation=pass<40?(pass%2===0?.50:-.53):.35;
+   return p.clone().lerp(average.divideScalar(sum),relaxation*region[i]);
   });
  }
  const correction=fair.map((p,i)=>p.sub(posed[i]).toArray());

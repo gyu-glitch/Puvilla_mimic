@@ -14,4 +14,5 @@ This directory is the Codex-owned copy. Claude continues in `C:/SSG_Christmas/pu
 - Do not use `work/sit1015` for the current standing-character task.
 - Earlier README/CLAUDE/HANDOFF deployment addresses refer to the original project. This file governs Codex workspace ownership and deployment.
 - Preserve the face, scarf, fur, background, and filter baseline while developing the requested arm behavior. Do not change the vendor oil filter.
+- Official 3D guide: `../asset/PUUVILLA IP FINAL/1 GUIDE/Puuvilla Character Guidebook_0911_FINAL.pdf`, especially pages 24, 31–33 and 44–50. Read `docs/PUUVILLA_3D_GUIDE.md` for verified findings. Preserve source hand/arm proportions; do not reintroduce paw expansion, axial shortening or global shoulder scaling to hide rig problems.
 

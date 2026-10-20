@@ -5,12 +5,9 @@ import * as THREE from "three";
  * The shoulder and torso are excluded by the connected-topology mask. */
 export class StandingArmSurface {
   readonly turn = { value: new THREE.Vector2() };
-  readonly spread = { value: new THREE.Vector2() };
-  readonly shoulderShape = { value: new THREE.Vector2() };
-  readonly pawShorten = { value: new THREE.Vector2() };
+  readonly socketActivation = { value: new THREE.Vector2() };
   readonly wrist = { value: [new THREE.Vector3(), new THREE.Vector3()] };
   readonly correctiveRotation = { value: [new THREE.Quaternion(), new THREE.Quaternion()] };
-  readonly bodyRotation = { value: new THREE.Quaternion() };
   private origin: THREE.Vector3[];
   private axis: THREE.Vector3[];
   private length: number[];
@@ -29,11 +26,9 @@ export class StandingArmSurface {
     material.onBeforeCompile = (shader, renderer) => {
       compile.call(material, shader, renderer);
       Object.assign(shader.uniforms, {
-        uPawTurn: this.turn, uPawSpread: this.spread, uPawWrist: this.wrist,
-        uShoulderShape: this.shoulderShape,
-        uPawShorten: this.pawShorten,
+        uPawTurn: this.turn, uPawWrist: this.wrist,
+        uSocketActivation: this.socketActivation,
         uSocketRotation: this.correctiveRotation,
-        uSocketBodyRotation: this.bodyRotation,
         uArmOrigin: { value: this.origin }, uArmAxis: { value: this.axis },
         uArmLength: { value: this.length },
       });
@@ -41,9 +36,8 @@ export class StandingArmSurface {
 attribute vec3 connectedArmWeights;
 attribute vec3 connectedArmCorrective;
 uniform vec4 uSocketRotation[2];
-uniform vec4 uSocketBodyRotation;
 varying float vSocketNormalBlend;
-uniform vec2 uPawTurn, uPawSpread, uShoulderShape, uPawShorten;
+uniform vec2 uPawTurn, uSocketActivation;
 uniform vec3 uPawWrist[2];
 uniform vec3 uArmOrigin[2], uArmAxis[2];
 uniform float uArmLength[2];
@@ -63,51 +57,21 @@ void pvAddDQ(mat4 m,float weight,vec4 reference,inout vec4 real,inout vec4 dual)
 vec3 pvArmRotate(vec3 p, vec3 axis, float a) {
   return p*cos(a)+cross(axis,p)*sin(a)+axis*dot(axis,p)*(1.0-cos(a));
 }
-// The source armpit includes a broad apron of torso skin. During a high raise,
-// carry that fold upward into the socket instead of leaving a hanging shelf.
-void pvSocketLift(vec3 rest, vec4 rotation, out vec3 offset, out vec3 gradient) {
-  int side=rest.x>=0.0?0:1;
-  vec3 axis=uArmAxis[side];
-  float t=dot(rest-uArmOrigin[side],axis)/uArmLength[side];
-  float a=clamp((t+.25)/.25,0.0,1.0), b=clamp((t-.03)/.37,0.0,1.0);
-  float enter=a*a*(3.0-2.0*a), leave=1.0-b*b*(3.0-2.0*b);
-  float strength=uShoulderShape[side]*(7.5/.43)*clamp(connectedArmWeights.x+connectedArmWeights.y,0.0,1.0);
-  offset=pvRotateQ(uSocketBodyRotation,vec3(0.0,strength*enter*leave,0.0));
-  float derivative=strength*(6.0*a*(1.0-a)*leave/.25-enter*6.0*b*(1.0-b)/.37)/uArmLength[side];
-  gradient=pvRotateQ(rotation,axis)*derivative;
-}
 void pvArmSurface(vec3 p, vec3 n, out vec3 deformed, out vec3 deformedNormal) {
   int side = position.x >= 0.0 ? 0 : 1;
   vec3 axis=uArmAxis[side], offset=p-uArmOrigin[side];
   float length=uArmLength[side], distance=dot(offset,axis), t=distance/length;
   float mask=clamp(connectedArmWeights.x+connectedArmWeights.y,0.0,1.0);
   float a=uPawTurn[side]*smoothstep(.30,.84,t)*mask;
-  float shoulderIn=smoothstep(-.18,.06,t), shoulderOut=1.0-smoothstep(.22,.58,t);
-  float pawScale=1.0+uPawSpread[side]*smoothstep(.68,.94,t)*mask;
-  float shaping=uShoulderShape[side]*shoulderIn*shoulderOut*mask;
-  float scale=pawScale-shaping*.40, depthScale=pawScale-shaping;
   vec3 radial=offset-axis*distance;
-  vec3 width=normalize(cross(axis,vec3(0.0,0.0,1.0))), depth=cross(width,axis);
-  vec3 rw=width*dot(radial,width), rd=depth*dot(radial,depth);
-  vec3 rr=pvArmRotate(rw*scale+rd*depthScale,axis,a);
-  // A compact mitten silhouette when raised. Integrating smoothstep keeps the
-  // wrist transition smooth, and leaves the relaxed source pose unchanged.
-  float pt=clamp((t-.70)/.14,0.0,1.0);
-  float shorten=uPawShorten[side]*mask;
-  float compressed=distance-shorten*length*(.14*(pt*pt*pt-.5*pt*pt*pt*pt)+max(0.0,t-.84));
-  float axialScale=1.0-shorten*pt*pt*(3.0-2.0*pt);
-  deformed=uArmOrigin[side]+axis*compressed+rr;
-  // Inverse-transpose of the twist/scale Jacobian, including the longitudinal
-  // derivative; prevents a false dark seam through the rolled forearm.
+  vec3 rr=pvArmRotate(radial,axis,a);
+  deformed=uArmOrigin[side]+axis*distance+rr;
+  // Cross-sections only rotate: the guidebook's source dimensions are retained.
   float at=clamp((t-.30)/.54,0.0,1.0);
-  float st=clamp((t-.68)/.26,0.0,1.0);
   float da=uPawTurn[side]*mask*6.0*at*(1.0-at)/(.54*length);
-  float ds=uPawSpread[side]*mask*6.0*st*(1.0-st)/(.26*length);
-  float si=clamp((t+.18)/.24,0.0,1.0),so=clamp((t-.22)/.36,0.0,1.0);
-  float shapeDerivative=uShoulderShape[side]*mask*(6.0*si*(1.0-si)*shoulderOut/.24-6.0*so*(1.0-so)*shoulderIn/.36)/length;
-  vec3 rn=pvArmRotate(width*dot(n,width)/scale+depth*dot(n,depth)/depthScale,axis,a);
-  vec3 tangent=pvArmRotate(rw*(ds-shapeDerivative*.40)+rd*(ds-shapeDerivative),axis,a)+cross(axis,rr)*da;
-  deformedNormal=normalize(rn+axis*(dot(n,axis)-dot(rn,tangent))/axialScale);
+  vec3 rn=pvArmRotate(n-axis*dot(n,axis),axis,a);
+  vec3 tangent=cross(axis,rr)*da;
+  deformedNormal=normalize(rn+axis*(dot(n,axis)-dot(rn,tangent)));
   // A separate soft wrist: palm motion no longer rotates the entire forearm.
   // Keep the transition differentiable, including its normal transform.
   float bend=sqrt(dot(uPawWrist[side],uPawWrist[side]));
@@ -128,7 +92,7 @@ void pvArmSurface(vec3 p, vec3 n, out vec3 deformed, out vec3 deformedNormal) {
         .replace("#include <skinbase_vertex>", /* glsl */ `
 #include <skinbase_vertex>
 float socketWeight=clamp(connectedArmWeights.x+connectedArmWeights.y,0.0,1.0);
-vSocketNormalBlend=max(4.0*socketWeight*(1.0-socketWeight),smoothstep(.1,1.0,length(connectedArmCorrective))*uShoulderShape[position.x>=0.0?0:1]/.43);
+vSocketNormalBlend=max(4.0*socketWeight*(1.0-socketWeight),smoothstep(.1,1.0,length(connectedArmCorrective))*uSocketActivation[position.x>=0.0?0:1]);
 vec4 pawReal=vec4(0.0,0.0,0.0,1.0),pawDual=vec4(0.0);
 bool pawDQ=connectedArmWeights.x+connectedArmWeights.y>.0001;
 if(pawDQ){
@@ -147,9 +111,6 @@ pvArmSurface(position, objectNormal, pawUnused, pawNormal);
 objectNormal=pawNormal;
 if(pawDQ){
   objectNormal=pvRotateQ(pawReal,objectNormal);
-  vec3 liftOffset,liftGradient;pvSocketLift(position,pawReal,liftOffset,liftGradient);
-  vec3 liftUp=pvRotateQ(uSocketBodyRotation,vec3(0.0,1.0,0.0));
-  objectNormal=normalize(objectNormal-liftGradient*dot(objectNormal,liftUp)/max(.3,1.0+dot(liftGradient,liftUp)));
 }else{
 #include <skinnormal_vertex>
 }`)
@@ -159,9 +120,8 @@ pvArmSurface(transformed, normal, pawPosition, pawUnusedNormal);
 transformed=pawPosition;
 if(pawDQ){
   transformed=pvRotateQ(pawReal,transformed)+2.0*(pawReal.w*pawDual.xyz-pawDual.w*pawReal.xyz+cross(pawReal.xyz,pawDual.xyz));
-  vec3 liftOffset,liftGradient;pvSocketLift(position,pawReal,liftOffset,liftGradient);transformed+=liftOffset;
   int socketSide=position.x>=0.0?0:1;
-  transformed+=pvRotateQ(uSocketRotation[socketSide],connectedArmCorrective)*(uShoulderShape[socketSide]/.43);
+  transformed+=pvRotateQ(uSocketRotation[socketSide],connectedArmCorrective)*uSocketActivation[socketSide];
 }else{
 #include <skinning_vertex>
 }`);
@@ -174,6 +134,6 @@ vec3 socketNormal=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));
 normal=normalize(mix(normal,socketNormal,vSocketNormalBlend));
 `);
     };
-    material.customProgramCacheKey = () => cache + "-continuous-paw-dq-wrist-v3";
+    material.customProgramCacheKey = () => cache + "-guide-proportions-v4";
   }
 }
