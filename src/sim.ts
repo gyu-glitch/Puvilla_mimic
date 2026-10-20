@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { Config } from "./config";
 import { emptySignal, type FaceSignal } from "./signals";
 import type { BodyPose, V3 } from "./body";
-import { standingWavePose } from './standingWave';
+import { standingWaveMotion, standingWavePose } from './standingWave';
 
 /**
  * `?sim=1` — 웹캠 없이 캐릭터·FSM 을 확인하는 시뮬레이터. 카메라/트래커를 건너뛰고 FaceSignal 을 직접 만든다.
@@ -87,8 +87,9 @@ export class SimInput {
         phF = phU;
       }
       if (wave > 0) {
-        thU = thU + (2.4 - thU) * wave;
-        thF = thF + (2.86+Math.sin(timeSec*2.5)*.08 - thF) * wave;
+        const motion=standingWaveMotion(timeSec);
+        thU = thU + (motion.upper - thU) * wave;
+        thF = thF + (motion.upper+motion.bend - thF) * wave;
         phU = phU + (.08-phU)*wave;phF=phU;
       }
       const s = new THREE.Vector3(side * 0.18, 0.48, 0);
@@ -98,12 +99,14 @@ export class SimInput {
         const r = v.clone().applyQuaternion(R);
         return [r.x, r.y, r.z];
       };
-      return { s: t(s), e: t(e), w: t(w) };
+      const hand=dir(side,thF+standingWaveMotion(timeSec).wrist*wave,phF);
+      return { s: t(s), e: t(e), w: t(w), hand:t(hand) };
     };
     const L = arm(1), Rr = arm(-1);
     return {
       shoulderL: L.s, elbowL: L.e, wristL: L.w,
       shoulderR: Rr.s, elbowR: Rr.e, wristR: Rr.w,
+      handDirectionL:L.hand,handDirectionR:Rr.hand,
       hipL: [0.1, 0, 0], hipR: [-0.1, 0, 0],
       armL: 1, armR: 1, hips: 1,
     };

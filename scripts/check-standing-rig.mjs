@@ -25,6 +25,13 @@ rig.weights.forEach((w,i)=>{
  if(w[0]+w[1]>.999)arms++;
 });
 assert.ok(arms>300);assert.ok(torso>400);
+assert.equal(rig.corrective.length,rig.rest.length);
+rig.corrective.forEach((d,i)=>{
+ assert.ok(d.every(Number.isFinite)&&Math.hypot(...d)<10,'socket corrective must remain bounded');
+ const [x,y]=rig.rest[i];
+ if(y>=119||Math.abs(x)<=15||rig.weights[i][0]+rig.weights[i][1]===0)
+  assert.deepEqual(d,[0,0,0],'socket correction reached protected source vertices');
+});
 for(const joint of ['shoulder','elbow','hand']){
  assert.equal(rig.joints.L[joint][0],-rig.joints.R[joint][0]);
  assert.deepEqual(rig.joints.L[joint].slice(1),rig.joints.R[joint].slice(1));
@@ -56,8 +63,10 @@ Object.assign(handRaw.world[19],{x:.47,y:-.62,z:-.2});
 const handProcessor=new BodyProcessor(cfg);
 const hand=handProcessor.update(handRaw,true,1000);
 assert.ok(hand.handAcrossR[0]>.99,'mirrored raised palm thumb must face toward the head');
+assert.ok(hand.handDirectionR[1]>.99,'wrist-to-fingers must be independent from the tilted forearm');
 handRaw.world[19].visibility=.1;
 assert.equal(handProcessor.update(handRaw,true,1100).handAcrossR,undefined);
+assert.equal(handProcessor.update(handRaw,true,1100).handDirectionR,undefined);
 assert.ok(handProcessor.update(handRaw,true,1100).armR>=cfg.body.minVisibility,'bad palm discarded a valid arm');
 handRaw.world[19].visibility=1;Object.assign(handRaw.world[19],handRaw.world[17]);
 assert.equal(handProcessor.update(handRaw,true,1200).handAcrossR,undefined);
@@ -65,10 +74,20 @@ const {standingWavePose}=await import('../src/standingWave.ts');
 const start=standingWavePose(0,0),wave=standingWavePose(0);
 assert.ok(start.wristR[1]<start.elbowR[1]);
 assert.ok(wave.wristR[1]>wave.elbowR[1]&&wave.elbowR[1]>wave.shoulderR[1],'greeting must rise along the whole arm');
-let xmin=Infinity,xmax=-Infinity;
+let xmin=Infinity,xmax=-Infinity,hmin=Infinity,hmax=-Infinity;
 for(let t=0;t<6;t+=.02){const p=standingWavePose(t);xmin=Math.min(xmin,p.wristR[0]);xmax=Math.max(xmax,p.wristR[0]);
- assert.deepEqual(p.shoulderR,wave.shoulderR);assert.deepEqual(p.elbowR,wave.elbowR);assert.deepEqual(p.wristL,wave.wristL);
+ assert.deepEqual(p.shoulderR,wave.shoulderR);assert.deepEqual(p.wristL,wave.wristL);
+ assert.ok(Math.hypot(...p.elbowR.map((v,i)=>v-wave.elbowR[i]))<.004,'upper arm response too large');
+ hmin=Math.min(hmin,p.handDirectionR[0]);hmax=Math.max(hmax,p.handDirectionR[0]);
+ const mirror=standingWavePose(t,1,1);
+ assert.ok(Math.abs(mirror.handDirectionL[0]+p.handDirectionR[0])<1e-10);
 }
-assert.ok(xmax-xmin>.02&&xmax-xmin<.05,'greeting swing should remain small');
-console.log('PASS: mirrored hand orientation; invalid/occluded palm fallback; continuous reference wave with fixed shoulder and small forearm swing.');
+assert.ok(xmax-xmin>.01&&xmax-xmin<.04,'forearm response should remain small');
+assert.ok(hmax-hmin>.25&&hmax-hmin<.5,'palm must lead the greeting');
+assert.deepEqual(standingWavePose(3.4),standingWavePose(4.2),'greeting should have a quiet pause');
+for(const edge of [0,3.2,4.6]){
+ const a=standingWavePose(edge-.0001),b=standingWavePose(edge+.0001);
+ assert.ok(Math.hypot(...a.handDirectionR.map((v,i)=>v-b.handDirectionR[i]))<.0001,'wave restart popped');
+}
+console.log('PASS: mirrored wrist and palm orientation; invalid/occluded palm fallback; wrist-led greeting with small delayed arm response, quiet pause and smooth cycle boundaries.');
 console.log(`PASS: original body/scarf hashes; ${torso} fixed torso/head vertices; ${arms} fully weighted arm vertices; symmetric joints; mirrored tracking; independent occlusion hold/release; NaN recovery; face/body association.`);

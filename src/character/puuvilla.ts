@@ -10,6 +10,7 @@ import { fillMouthGroove, smoothDepth } from "./mouthRig";
 import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, makeKnitMaterial, pca, type MufflerSrc } from "./outfit";
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
 import { StandingArmSurface } from "./standingArmSurface";
+import { standingWaveMotion } from "../standingWave";
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -80,7 +81,7 @@ interface ArmRig {
 
 /** 팔 분리 케이지의 관절 (pu_stand_arm.json — scripts/stand_arm_split.py). 앱 cm */
 interface ArmJoints { R: { shoulder: number[]; elbow: number[]; hand: number[] }; L: { shoulder: number[]; elbow: number[]; hand: number[] } }
-interface StandingRig { version: number; body: string; rest: number[][]; weights: number[][]; joints: ArmJoints }
+interface StandingRig { version: number; body: string; rest: number[][]; weights: number[][]; joints: ArmJoints; corrective?: number[][] }
 
 /** Seat_A 리깅본 (public/models/seat.bin — dev/armsplit.html 이 만듦) */
 interface SeatBone { name: string; parent: number; pos: number[]; follow?: { bone: number; frac: number } }
@@ -455,6 +456,8 @@ export class PuuvillaCharacter implements CharacterRig {
         const wg = toBufferGeometry(subdivide({ ...part, positions: standingRig.weights }, ch.subdivLevels));
         geo.setAttribute("connectedArmWeights", wg.getAttribute("position").clone());
         wg.dispose();
+        const cg=toBufferGeometry(subdivide({...part,positions:standingRig.corrective??standingRig.weights.map(()=>[0,0,0])},ch.subdivLevels));
+        geo.setAttribute('connectedArmCorrective',cg.getAttribute('position').clone());cg.dispose();
       }
 
       if (n.includes("eye") || n.includes("ryes") || n.includes("nose")) {
@@ -1028,10 +1031,11 @@ export class PuuvillaCharacter implements CharacterRig {
           tu.slerp(ID, 1 - wave);
           tf.slerp(ID, 1 - wave);
         } else {
-          const d = polarDir(arm.side, this.connectedArms?2.4:2.1, this.connectedArms ? .08 : .35);
+          const motion=standingWaveMotion(timeSec);
+          const d = polarDir(arm.side, this.connectedArms?motion.upper:2.1, this.connectedArms ? motion.depth : .35);
           tu.setFromUnitVectors(arm.restUpper, d).slerp(this.connectedArms?_qIdle:ID, 1 - wave);
           _n.set(0, 0, 1);
-          tf.setFromAxisAngle(_n, arm.side * (this.connectedArms?(.46+Math.sin(timeSec*2.5)*.08):(.5+Math.sin(timeSec*9)*.35)) * wave);
+          tf.setFromAxisAngle(_n, arm.side * (this.connectedArms?motion.bend:(.5+Math.sin(timeSec*9)*.35)) * wave);
         }
       } else {
         const sway = Math.sin(timeSec * 1.3 + (arm.side > 0 ? 0 : 1.1)) * 0.03;
@@ -1071,7 +1075,29 @@ export class PuuvillaCharacter implements CharacterRig {
         }
         const current = this.armSurface.turn.value.getComponent(i);
         this.armSurface.turn.value.setComponent(i, current + (target-current)*k);
-        this.armSurface.spread.value.setComponent(i, .20*raised);
+        this.armSurface.spread.value.setComponent(i, .12*raised);
+        this.armSurface.pawShorten.value.setComponent(i, .24*raised);
+        const upperY=arm.restUpper.clone().applyQuaternion(arm.qUpper).y;
+        this.armSurface.shoulderShape.value.setComponent(i,.43*smooth(-.35,.70,upperY));
+        const reference=new THREE.Quaternion().setFromUnitVectors(arm.restUpper,polarDir(arm.side,2.32,.08));
+        this.armSurface.bodyRotation.value.multiplyQuaternions(spine.quaternion,chest.quaternion);
+        this.armSurface.correctiveRotation.value[i].copy(this.armSurface.bodyRotation.value).multiply(arm.qUpper).multiply(reference.invert());
+        const handDirection=pose && conf>=this.cfg.body.minVisibility
+          ? (arm.side>0?pose.handDirectionL:pose.handDirectionR) : undefined;
+        const wristTarget=new THREE.Vector3();
+        if(!pose&&wave>0&&arm.side<0)wristTarget.z=arm.side*standingWaveMotion(timeSec).wrist*wave;
+        if(handDirection){
+          const humanFore=vec(arm.side>0?pose!.wristL:pose!.wristR)
+            .sub(vec(arm.side>0?pose!.elbowL:pose!.elbowR)).normalize()
+            .applyQuaternion(humanTorso.clone().invert());
+          const palm=vec(handDirection).normalize().applyQuaternion(humanTorso.clone().invert())
+            .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(humanFore,direction))
+            .applyQuaternion(arm.qUpper.clone().invert()).applyQuaternion(arm.qFore.clone().invert());
+          wristTarget.crossVectors(arm.restFore,palm);
+          if(wristTarget.lengthSq()>.000001)
+            wristTarget.normalize().multiplyScalar(Math.min(.42,arm.restFore.angleTo(palm)));
+        }
+        this.armSurface.wrist.value[i].lerp(wristTarget,k);
       }
       // 떼어 낸 팔 부품: 들수록 가늘게 (위팔 방향의 y 로 든 정도 — 내린 팔 ≈ -0.8, 다 든 팔 ≈ +0.6)
       for (const sl of this.armSlim) {

@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { parseObj } from '../src/character/subdivide.ts';
+import { socketCorrective } from './standing-socket-corrective.mjs';
 
 const source = readFileSync('public/models/pu_stand.obj', 'utf8');
 const mesh = parseObj(source).find(m => m.name === 'pu_body');
@@ -60,7 +61,7 @@ for(const side of [-1,1]){
  const shoulder=[socket[0]-side*2,socket[1],socket[2]],elbow=at(.50),hand=at(.90);
  joints[side>0?'L':'R']={shoulder,elbow,hand};
  for(let i=0;i<P.length;i++){
-  let w=arm.has(i)? .32+.68*smooth(0,15,da[i]) : .32*(1-smooth(0,9,dt[i]));
+  let w=arm.has(i)? .60+.40*smooth(0,13,da[i]) : .60*(1-smooth(0,11,dt[i]));
   if(!Number.isFinite(w))w=0;
   w*=smooth(15,22,Math.abs(P[i][0]))*(1-smooth(110,119,P[i][1]));
   weights[i][side>0?0:1]=w;
@@ -77,7 +78,7 @@ for(const key of ['shoulder','hand']){
 for(const side of ['L','R'])joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
 const portrait=!process.argv.includes('--legacy')&&!process.argv.includes('--sections');
 if(portrait)for(const side of ['L','R']){
- joints[side].shoulder[1]-=3;
+ joints[side].shoulder[1]+=1;
  joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
 }
 // Experimental cross-section weights: every point on a plane normal to the
@@ -91,7 +92,8 @@ if(sections){
   weights[i][2]=(weights[i][0]+weights[i][1])*smooth(-6,6,along);
  }
 }
-const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints};
+const corrective=socketCorrective(P,neighbors,weights,joints);
+const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints,corrective};
 const suffix=process.argv.includes('--portrait')?'_portrait':process.argv.includes('--sections')?'_sections':process.argv.includes('--legacy')?'_legacy':'';
 writeFileSync(`public/models/stand_connected_rig${suffix}.json`,JSON.stringify(data));
 console.log(`Saved connected rig: ${P.length} cage vertices, original topology unchanged.`);

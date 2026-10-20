@@ -15,6 +15,8 @@ export interface BodyPose {
   wristL: V3; wristR: V3;
   /** Pinky-to-index direction, when the pose model has a reliable hand span. */
   handAcrossL?: V3; handAcrossR?: V3;
+  /** Wrist toward the index/pinky midpoint, independent of forearm direction. */
+  handDirectionL?: V3; handDirectionR?: V3;
   hipL: V3; hipR: V3;
   /** 0~1 신뢰도 */
   armL: number;
@@ -113,16 +115,20 @@ export class BodyProcessor {
     }
 
     this.lastSeenMs = nowMs;
-    const hands: { handAcrossL?: V3; handAcrossR?: V3 } = {};
+    const hands: Pick<BodyPose,'handAcrossL'|'handAcrossR'|'handDirectionL'|'handDirectionR'> = {};
     for(const s of ['L','R'] as const){
       // MediaPipe Pose: left pinky/index 17/19, right pinky/index 18/20.
       const right = side[s][0] === LM.rShoulder;
       const pinky=right?18:17, index=right?20:19;
-      if(Math.min(vis(pinky),vis(index),armConfidence[s]) < Math.max(.6,this.cfg.body.minVisibility))continue;
+      if(Math.min(vis(pinky),vis(index),vis(side[s][2]),armConfidence[s]) < Math.max(.6,this.cfg.body.minVisibility))continue;
       const a=pick(index),b=pick(pinky),span=a.map((v,i)=>v-b[i]) as V3;
       const length=Math.hypot(...span);
       if(length<.015||length>.20)continue;
       hands[`handAcross${s}`]=span.map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v/length,t)) as V3;
+      const wrist=pick(side[s][2]),forward=a.map((v,i)=>(v+b[i])*.5-wrist[i]) as V3;
+      const reach=Math.hypot(...forward);
+      if(reach>=.025&&reach<=.18)
+        hands[`handDirection${s}`]=forward.map((v,i)=>this.bank.filter(`handDirection${s}${i}`,v/reach,t)) as V3;
     }
     this.last = {
       ...pts,
