@@ -191,7 +191,8 @@ export class BodyProcessor {
       if ((k.startsWith("elbow") || k.startsWith("wrist")) && held[armSide]) continue;
       if ((k.startsWith("elbow") || k.startsWith("wrist")) && armConfidence[armSide] < this.cfg.body.minVisibility) continue;
       const p = pts[k];
-      pts[k] = [this.bank.filter(`${k}x`, p[0], t), this.bank.filter(`${k}y`, p[1], t), this.bank.filter(`${k}z`, p[2], t)];
+      const responsive = !!this.cfg.body.responsiveArms && (k.startsWith("elbow") || k.startsWith("wrist"));
+      pts[k] = [this.bank.filter(`${k}x`, p[0], t, responsive), this.bank.filter(`${k}y`, p[1], t, responsive), this.bank.filter(`${k}z`, p[2], t, responsive)];
     }
     for (const s of ["L", "R"] as const) {
       if (armConfidence[s] === 0 || held[s]) {

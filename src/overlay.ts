@@ -35,7 +35,7 @@ export class Overlay {
   private statsEl: HTMLElement;
   private visible = true;
 
-  constructor(private cfg: Config, hooks: { onSmoothingChange: () => void; onCharacterChange: () => void; onSceneChange: () => void }) {
+  constructor(private cfg: Config, hooks: { onSmoothingChange: () => void; onCharacterChange: () => void; onSceneChange: () => void; onFaceNeutral?: () => void }) {
     this.statsEl = document.getElementById("stats")!;
     this.gui = new GUI({ title: `푸빌라 미믹 튜닝  (d: 숨기기) · 버전 ${cfg.build}`, width: 360 });
     const onC = hooks.onCharacterChange;
@@ -62,6 +62,12 @@ export class Overlay {
     f1.$children.appendChild(hint);
 
     const f2 = this.gui.addFolder("고개·표정 매핑 — 얼마나 크게 따라할지");
+    f2.add(cfg.mapping, "autoNeutral").name("카메라 각도·뜬 눈 자동 기준").onChange(() => hooks.onFaceNeutral?.());
+    f2.add({ calibrate: () => hooks.onFaceNeutral?.() }, "calibrate").name("화면 보고 눈 뜬 상태로 기준 다시 맞춤");
+    const neutralHint = document.createElement("div");
+    neutralHint.style.cssText = "padding:4px 8px;font-size:11px;line-height:1.5;color:#b9c2d0";
+    neutralHint.textContent = "처음 잡힌 사람이 화면을 보고 눈을 뜬 채 약 1초 멈추면 고개·눈 기준을 맞춥니다. 이후 고개 숙이기와 깜빡임은 그대로 따라갑니다. 처음 자세가 잘못 잡혔으면 위 버튼으로 다시 맞추세요.";
+    f2.$children.appendChild(neutralHint);
     f2.add(cfg.mapping, "yawGain", 0, 3, 0.05).name("좌우 고개 배율 (×)");
     f2.add(cfg.mapping, "pitchGain", 0, 3, 0.05).name("상하 고개 배율 (×)");
     f2.add(cfg.mapping, "rollGain", 0, 3, 0.05).name("갸웃 배율 (×)");
@@ -98,6 +104,7 @@ export class Overlay {
     f8.add(cfg.body, "lostHoldMs", 0, 3000, 50).name("몸 놓쳐도 유지 (ms)");
     f8.add(cfg.body, "minCutoff", 0.1, 5, 0.05).name("팔 부드러움 (작을수록 부드럽고 느림)").onChange(hooks.onSmoothingChange);
     f8.add(cfg.body, "beta", 0, 2, 0.01).name("팔 빠른 동작 반응 (클수록 빠름)").onChange(hooks.onSmoothingChange);
+    f8.add(cfg.body, "responsiveArms").name("큰 팔 동작 빠르게 따라가기");
     f8.close();
 
     const f8b = this.gui.addFolder("자유 팔 (생성 A포즈 몸) — 쉬는 자세·인사");
@@ -309,6 +316,7 @@ export class Overlay {
       `얼굴      ${s.sig.faceCount}명  있음=${s.sig.present ? "O" : "X"}  가까움=${s.sig.near ? "O" : "X"}\n` +
       `          bboxH(얼굴 크기)=${s.sig.bboxH.toFixed(3)}  cx(가로 위치)=${s.sig.cx.toFixed(2)}\n` +
       `고개      좌우 ${s.sig.yaw.toFixed(1)}°  상하 ${s.sig.pitch.toFixed(1)}°  갸웃 ${s.sig.roll.toFixed(1)}°\n` +
+      `기준      ${!this.cfg.mapping.autoNeutral ? "자동 보정 꺼짐" : b.__neutralReady ? "고개·뜬 눈 기준 완료" : "화면 보고 눈 뜬 채 약 1초 정지"}\n` +
       `상반신    ${body}\n` +
       // 입 판정 원값 — 다물었는데 'o' / 시무룩 안 됨 같은 문제는 이 줄로 확인
       `입        입술간격 ${(b.__dbgOpenRaw ?? 0).toFixed(3)} (무표정 ${(b.__dbgOpenBase ?? 0).toFixed(3)}, 'o' 기준 +${s.mouthOpenFrom.toFixed(2)})` +

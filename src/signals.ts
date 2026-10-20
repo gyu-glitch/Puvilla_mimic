@@ -2,6 +2,7 @@ import type { Config } from "./config";
 import type { RawFace, TrackResult } from "./tracker";
 import { OneEuro, OneEuroBank } from "./smoothing";
 import { log } from "./logger";
+import { FaceNeutral } from "./faceNeutral";
 
 export type Expression = "neutral" | "smile" | "surprise";
 
@@ -28,6 +29,14 @@ const USED_BLENDS = [
 ] as const;
 
 export class SignalProcessor {
+  private neutral = new FaceNeutral();
+  get neutralReady(): boolean { return this.neutral.ready; }
+  recalibrateNeutral(): void {
+    this.neutral.reset();
+    this.fPitch.reset();
+    this.blinkFilters.reset();
+    this.mouthBase = null;
+  }
   private fYaw: OneEuro;
   private fPitch: OneEuro;
   private fRoll: OneEuro;
@@ -136,6 +145,7 @@ export class SignalProcessor {
       }
     }
     if (pick) {
+      this.resetFilters();
       log.info("signal", `lock on h=${pick.bbox.h.toFixed(2)} cx=${pick.bbox.cx.toFixed(2)} (후보 ${faces.filter((f) => this.inZone(f)).length}명)`);
       this.lastTarget = { cx: pick.bbox.cx, cy: pick.bbox.cy, h: pick.bbox.h };
       this.lockMissSinceMs = 0;
@@ -169,8 +179,9 @@ export class SignalProcessor {
 
     if (target) {
       this.lastSeenMs = nowMs;
+      if (this.cfg.mapping.autoNeutral) this.neutral.update(target, nowMs);
       const yaw = this.fYaw.filter(target.yaw * mirror, t);
-      const pitch = this.fPitch.filter(target.pitch, t);
+      const pitch = this.fPitch.filter(this.cfg.mapping.autoNeutral ? this.neutral.pitch(target.pitch) : target.pitch, t);
       const roll = this.fRoll.filter(target.roll * mirror, t);
       // Preserve landscape distance tuning while using the short side for a
       // portrait source. Otherwise a locked portrait face can never enter
@@ -194,6 +205,11 @@ export class SignalProcessor {
       blend.__geoOpenRaw = this.blends.filter("__geoOpen", target.mouth?.open ?? 0, t);
       blend.__geoCornerRaw = this.blends.filter("__geoCorner", target.mouth?.corner ?? 0, t);
       this.mouthRelative(blend, nowMs);
+      if (this.cfg.mapping.autoNeutral) {
+        blend.__neutralReady = this.neutral.ready ? 1 : 0;
+        blend.__blinkRelLeft = this.neutral.blink(blend.__earLeft, this.cfg.camera.mirror ? "right" : "left");
+        blend.__blinkRelRight = this.neutral.blink(blend.__earRight, this.cfg.camera.mirror ? "left" : "right");
+      }
 
       // 접근 히스테리시스 + 화면 중앙 근처 조건
       const centered = Math.abs(cx - 0.5) <= p.centerToleranceX;
@@ -302,6 +318,7 @@ export class SignalProcessor {
   }
 
   private resetFilters(): void {
+    this.neutral.reset();
     this.mouthBase = null;
     this.blinkFilters.reset();
     for (const f of [this.fYaw, this.fPitch, this.fRoll, this.fBbox, this.fCx]) f.reset();

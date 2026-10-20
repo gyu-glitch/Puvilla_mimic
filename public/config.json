@@ -74,7 +74,8 @@
     "mouthBaselineSec": 8,
     "jawGain": 1.2,
     "browGain": 1,
-    "blendDeadzone": 0.06
+    "blendDeadzone": 0.06,
+    "autoNeutral": true
   },
   "expression": {
     "smileThreshold": 0.45,
@@ -188,7 +189,8 @@
     "armElbowPlane": true,
     "armPawFrame": true,
     "armImagePalm": true,
-    "armFollowPose": true
+    "armFollowPose": true,
+    "responsiveArms": true
   },
   "scene": {
     "bgTop": "#F76A4B",

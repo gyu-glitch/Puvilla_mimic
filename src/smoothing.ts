@@ -22,7 +22,7 @@ export class OneEuro {
   }
 
   /** @param t 초 단위 타임스탬프 */
-  filter(x: number, t: number): number {
+  filter(x: number, t: number, responsive = false): number {
     if (this.xPrev === null || this.tPrev === null) {
       this.xPrev = x;
       this.tPrev = t;
@@ -35,7 +35,10 @@ export class OneEuro {
     const aD = OneEuro.alpha(this.dCutoff, dt);
     const dxHat = aD * dx + (1 - aD) * this.dxPrev;
 
-    const cutoff = this.minCutoff + this.beta * Math.abs(dxHat);
+    // Metre-space arm joints: keep the original filter below 15 mm,
+    // progressively open the bandwidth for a deliberate large movement.
+    const motion = responsive ? Math.min(1, Math.max(0, (Math.abs(x - this.xPrev) - .015) / .065)) : 0;
+    const cutoff = this.minCutoff + this.beta * Math.abs(dxHat) + 12 * motion * motion * (3 - 2 * motion);
     const a = OneEuro.alpha(cutoff, dt);
     const xHat = a * x + (1 - a) * this.xPrev;
 
@@ -61,13 +64,13 @@ export class OneEuroBank {
     }
   }
 
-  filter(key: string, x: number, t: number): number {
+  filter(key: string, x: number, t: number, responsive = false): number {
     let f = this.filters.get(key);
     if (!f) {
       f = new OneEuro(this.minCutoff, this.beta, this.dCutoff);
       this.filters.set(key, f);
     }
-    return f.filter(x, t);
+    return f.filter(x, t, responsive);
   }
 
   reset(): void {

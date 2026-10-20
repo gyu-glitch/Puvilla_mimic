@@ -1,0 +1,60 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8">
+<title>카메라 기준·팔 응답 검증</title>
+<style>body{margin:0;color:white;font:15px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>합성 고각 카메라(+24°) / 열린 눈 EAR .11 / 실제 BodyProcessor·캐릭터
+<button id="before">수정 전</button><button id="after">수정 후</button>
+<select id="view"><option value="0">정면</option><option value="-45">사선</option><option value="-90">측면</option></select>
+<button id="record">8초 영상 저장</button>
+<div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal,NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {BodyProcessor} from '/src/body.ts';
+import {armSessionFixture} from '/dev/arm-session-fixture.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();
+cfg.presence.mimicOnLock=true;cfg.mapping.autoNeutral=false;cfg.body.responsiveArms=false;
+cfg.scene.outputMirror=false;cfg.scene.layout='landscape';
+cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
+await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);
+scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let bodyProc=new BodyProcessor(cfg);
+let corrected=false,processor=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg),start=performance.now(),last=start;
+document.querySelector('#view').onchange=e=>{ch.root.rotation.y=Number(e.target.value)*Math.PI/180;};
+document.querySelector('#record').onclick=()=>{
+ start=performance.now();const chunks=[],stream=scene.renderer.domElement.captureStream(24);
+ const recorder=new MediaRecorder(stream,{mimeType:'video/webm'});
+ recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+ recorder.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`codex-v43-response-${corrected?'after':'before'}-${document.querySelector('#view').value}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);stream.getTracks().forEach(t=>t.stop());};
+ recorder.start();setTimeout(()=>recorder.stop(),8000);
+};
+for(const [id,fixed] of [['before',false],['after',true]])document.querySelector('#'+id).onclick=()=>{
+ corrected=fixed;cfg.mapping.autoNeutral=fixed;cfg.body.responsiveArms=fixed;bodyProc=new BodyProcessor(cfg);processor=new SignalProcessor(cfg);fsm=new MimicStateMachine(cfg);start=performance.now();
+};
+function frame(now){
+ const frameMs=now-last;const dt=Math.min(.05,frameMs/1000);last=now;
+ const t=(now-start)/1000,h=.182,phase=t%8;
+ const track={faces:[{bbox:{x:.44,y:.3-h/2,w:.12,h,cx:.5,cy:.3},
+  yaw:0,pitch:24+(phase>5&&phase<6?10:0),roll:0,blend:{},mouth:{open:.12,corner:.02},eyes:{left:phase<.1?.32:phase>4&&phase<4.2?.025:.11,right:phase<.1?.32:phase>4&&phase<4.2?.025:.11}}],inferenceMs:10};
+ const signal=processor.update(track,now,16/9);
+ const state=fsm.update(signal,now);
+ const p=state.state==='MIMIC'||state.state==='ENTER'?mapSignal(signal,cfg.mapping):NEUTRAL_PARAMS;
+ const lift=phase<2?phase/2:phase<5?1:phase<7?(7-phase)/2:0;
+ const sourceTime=phase<2?phase:phase<5?3:phase<7?16+(phase-5):19;
+ const raw=armSessionFixture(sourceTime,true).raw;
+ if(phase>2&&phase<5){for(const id of [15,16]){raw.world[id].x+=.035*Math.sin(phase*5);raw.image[id].x+=.035*Math.sin(phase*5)*.65/(16/9);}}
+ const body=bodyProc.update(raw,true,now);
+ ch.setState(state);ch.apply(p,dt,now/1000,body);scene.render();
+ document.querySelector('#status').textContent=
+ `${corrected?'수정 후':'수정 전'} | 기준 ${processor.neutralReady?'완료':'대기/꺼짐'} | 고개 ${signal.pitch.toFixed(1)}° | 눈 감김 ${p.blinkL.toFixed(2)} | ${state.state} | lift ${lift.toFixed(2)} | render ${frameMs.toFixed(0)}ms | arm ${body?.armL}`;
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

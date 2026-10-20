@@ -68,6 +68,7 @@ export interface Config {
   mapping: {
     yawGain: number;
     pitchGain: number;
+    autoNeutral: boolean;
     rollGain: number;
     yawClampDeg: number;
     pitchClampDeg: number;
@@ -258,6 +259,7 @@ export interface Config {
     /** 상반신이 안 보여도 이 시간(ms)은 마지막 자세 유지 */
     lostHoldMs: number;
     minCutoff: number;
+    responsiveArms: boolean;
     beta: number;
     torsoYawGain: number;
     torsoPitchGain: number;
@@ -464,6 +466,7 @@ export const DEFAULT_CONFIG: Config = {
   mapping: {
     yawGain: 1.2,
     pitchGain: 1.0,
+    autoNeutral: true,
     rollGain: 0.8,
     yawClampDeg: 40,
     pitchClampDeg: 25,
@@ -578,6 +581,7 @@ export const DEFAULT_CONFIG: Config = {
     minVisibility: 0.5,
     lostHoldMs: 500,
     minCutoff: 1.2,
+    responsiveArms: true,
     beta: 0.3,
     torsoYawGain: 0.8,
     torsoPitchGain: 0.5,

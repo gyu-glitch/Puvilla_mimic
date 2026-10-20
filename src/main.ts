@@ -162,6 +162,7 @@ async function main(): Promise<void> {
   const overlay = kiosk || touch
     ? null
     : new Overlay(cfg, {
+        onFaceNeutral: () => signals.recalibrateNeutral(),
         onSmoothingChange: () => {
           signals.applySmoothingParams();
           bodyProc.applySmoothingParams();

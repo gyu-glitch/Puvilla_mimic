@@ -1127,7 +1127,8 @@ export class PuuvillaCharacter implements CharacterRig {
     for(const arm of this.arms){
       const conf=pose?(arm.side>0?pose.armL:pose.armR):0;
       const contactIndex=arm.side>0?0:1,previousUpper=arm.qUpper.clone(),previousFore=arm.qFore.clone();
-      const armK=resting[contactIndex]?1-Math.exp(-7*dtSec):k;
+      const armK=resting[contactIndex]?1-Math.exp(-7*dtSec)
+        :following[contactIndex]&&this.cfg.body.responsiveArms?1-Math.exp(-28*dtSec):k;
       arm.qUpper.slerp(arm.tUpper, armK);
       arm.qFore.slerp(arm.tFore, armK);
       if(!following[contactIndex] && this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
