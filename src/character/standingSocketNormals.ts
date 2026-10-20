@@ -23,7 +23,7 @@ export function socketNormalProbes(geo: THREE.BufferGeometry): THREE.DataTexture
   const component=(a:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,i:number,k:number)=>a.getComponent(i,k);
   for(let i=0;i<p.count;i++){
     const mask=aw.getX(i)+aw.getY(i);
-    if(mask<=.0001 || (mask>=1 && Math.hypot(c.getX(i),c.getY(i),c.getZ(i))===0))continue;
+    if((mask<=.0001 || mask>=1) && Math.hypot(c.getX(i),c.getY(i),c.getZ(i))===0)continue;
     point.fromBufferAttribute(p,i);normal.fromBufferAttribute(n,i).normalize();
     u.set(Math.abs(normal.y)<.9?0:1,Math.abs(normal.y)<.9?1:0,0).cross(normal).normalize();
     v.crossVectors(normal,u).normalize();

@@ -174,7 +174,8 @@
     "elbowGain": 1,
     "armRaiseMaxRad": 3,
     "armRig": "connected",
-    "armRigPath": "./models/stand_connected_rig.json"
+    "armRigPath": "./models/stand_connected_cage_rig.json",
+    "armDeform": "cage"
   },
   "scene": {
     "bgTop": "#F76A4B",

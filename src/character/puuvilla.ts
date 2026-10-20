@@ -6,6 +6,7 @@ import { log } from "../logger";
 import { NEUTRAL_PARAMS, type CharacterParams } from "./mapping";
 import type { CharacterRig } from "./proxy";
 import { fixInvertedWinding, parseObj, subdivide, toBufferGeometry, type PolyMesh } from "./subdivide";
+import {StandingCageSurface} from './standingCageSurface';
 import { fillMouthGroove, smoothDepth } from "./mouthRig";
 import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, makeKnitMaterial, pca, type MufflerSrc } from "./outfit";
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
@@ -277,6 +278,7 @@ export class PuuvillaCharacter implements CharacterRig {
   private armSlim: { geo: THREE.BufferGeometry; side: 1 | -1; foot: Float32Array; radial: Float32Array; cur: number }[] = [];
   private connectedArms = false;
   private armSurface: StandingArmSurface | null = null;
+  private cageSurface: StandingCageSurface | null = null;
 
   private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null, standingRig: StandingRig | null = null) {
     this.connectedArms = standingRig !== null;
@@ -558,15 +560,23 @@ export class PuuvillaCharacter implements CharacterRig {
         geo.setAttribute("aMouthIn", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
       }
 
-      if(geo.getAttribute('connectedArmWeights') && this.armSurface)
-        this.armSurface.normalProbes.value=socketNormalProbes(geo);
+      if(geo.getAttribute('connectedArmWeights') && this.armSurface){
+        if(cfg.body.armDeform==='cage' && standingRig){
+          const skin=new THREE.BufferGeometry();
+          skin.setAttribute('position',new THREE.Float32BufferAttribute(part.positions.flat(),3));
+          skin.setAttribute('connectedArmWeights',new THREE.Float32BufferAttribute(standingRig.weights.flat(),3));
+          this.applySkinWeights(skin,1,true);
+          this.cageSurface=new StandingCageSurface(part,ch.subdivLevels,standingRig,skin,geo,this.armSurface,cfg.body.armCageRounded!==false);
+        }else this.armSurface.normalProbes.value=socketNormalProbes(geo);
+      }
       const add = (mat: THREE.Material, order: number) => {
-        if (geo.getAttribute("connectedArmWeights")) this.armSurface?.attach(mat);
+        if (geo.getAttribute("connectedArmWeights")) (this.cageSurface??this.armSurface)?.attach(mat);
         const m = new THREE.SkinnedMesh(geo, mat);
         m.frustumCulled = false;
         m.renderOrder = order;
         this.model.add(m);
         m.bind(skeleton);
+        if(geo.getAttribute('connectedArmWeights'))this.cageSurface?.bind(m);
         if (!isScarf) this.bodyMeshes.push(m);
         return m;
       };
@@ -1114,6 +1124,7 @@ export class PuuvillaCharacter implements CharacterRig {
     }
     // Seat_A 어깨 보조 본: 어깨 회전의 k/K (어깨 살·겨드랑이가 호를 그리며 따라감)
     for (const h of this.seatHelpers) h.bone.quaternion.slerpQuaternions(ID, h.src.quaternion, h.frac);
+    this.cageSurface?.update();
 
     // ── 눈: 감으면 눈알은 머리 속으로 작아지며 사라지고, 털이 덮고, 표면에 '‿' 곡선 (3D 가이드) ──
     if (timeSec >= this.nextBlinkAt) {

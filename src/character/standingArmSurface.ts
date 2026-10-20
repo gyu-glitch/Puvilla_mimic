@@ -123,7 +123,7 @@ void pvArmSurface(vec3 p, vec3 n, vec3 armWeights, out vec3 deformed, out vec3 d
   }
 }
 vec4 pvProbeTexel(int i){return texelFetch(uSocketProbes,ivec2(i%1024,i/1024),0);}
-vec3 pvProbeDeform(vec3 p,vec3 aw,vec3 correction,vec4 sw,mat4 mx,mat4 my,mat4 mz,mat4 mw,mat4 upperM,mat4 foreM){
+vec3 pvProbeDeform(vec3 p,vec3 aw,vec3 correction,vec4 sw,vec4 boneIndices,mat4 mx,mat4 my,mat4 mz,mat4 mw,mat4 upperM,mat4 foreM){
   vec3 point,unused;
   pvArmSurface(p,vec3(0.0,1.0,0.0),aw,point,unused);
   vec4 reference=pvRotation(mx),qr=vec4(0.0),qd=vec4(0.0);
@@ -131,7 +131,7 @@ vec3 pvProbeDeform(vec3 p,vec3 aw,vec3 correction,vec4 sw,mat4 mx,mat4 my,mat4 m
   pvAddDQ(mz,sw.z,reference,qr,qd);pvAddDQ(mw,sw.w,reference,qr,qd);
   float magnitude=max(length(qr),.00001);qr/=magnitude;qd/=magnitude;qd-=qr*dot(qr,qd);
   vec3 result=pvRotateQ(qr,point)+2.0*(qr.w*qd.xyz-qd.w*qr.xyz+cross(qr.xyz,qd.xyz));
-  float weight=smoothstep(.95,1.0,aw.x+aw.y);
+  float weight=smoothstep(.95,1.0,min(aw.x+aw.y,dot(sw,step(vec4(3.5),boneIndices))));
   if(weight>0.0){vec3 bent,bn;pvRoundedElbow(point,vec3(0.0,1.0,0.0),upperM,foreM,bent,bn);result=mix(result,bent,weight);}
   int side=position.x>=0.0?0:1;
   return result+pvRotateQ(uSocketRotation[side],correction)*uSocketActivation[side];
@@ -143,7 +143,7 @@ vec3 pvProbeDeform(vec3 p,vec3 aw,vec3 correction,vec4 sw,mat4 mx,mat4 my,mat4 m
 float socketWeight=clamp(connectedArmWeights.x+connectedArmWeights.y,0.0,1.0);
 float socketNormalBlend=max(4.0*socketWeight*(1.0-socketWeight),smoothstep(.1,1.0,length(connectedArmCorrective))*uSocketActivation[position.x>=0.0?0:1]);
 vec4 pawReal=vec4(0.0,0.0,0.0,1.0),pawDual=vec4(0.0);
-bool pawDQ=connectedArmWeights.x+connectedArmWeights.y>.0001;
+bool pawDQ=connectedArmWeights.x+connectedArmWeights.y>.0001||length(connectedArmCorrective)>.0001;
 if(pawDQ){
   mat4 px=bindMatrixInverse*boneMatX*bindMatrix;
   vec4 reference=pvRotation(px);pawReal=vec4(0.0);
@@ -160,7 +160,7 @@ pvArmSurface(position, objectNormal, connectedArmWeights, pawUnused, pawNormal);
 objectNormal=pawNormal;
 if(pawDQ){
   objectNormal=pvRotateQ(pawReal,objectNormal);
-  float bendWeight=smoothstep(.95,1.0,connectedArmWeights.x+connectedArmWeights.y);
+  float bendWeight=smoothstep(.95,1.0,min(connectedArmWeights.x+connectedArmWeights.y,dot(skinWeight,step(vec4(3.5),skinIndex))));
   if(bendWeight>0.0){
     bool left=position.x>=0.0;
     mat4 upperM=bindMatrixInverse*getBoneMatrix(left?4.0:6.0)*bindMatrix;
@@ -175,10 +175,10 @@ if(pawDQ){
     bool left=position.x>=0.0;
     mat4 upperM=bindMatrixInverse*getBoneMatrix(left?4.0:6.0)*bindMatrix;
     mat4 foreM=bindMatrixInverse*getBoneMatrix(left?5.0:7.0)*bindMatrix;
-    vec3 center=pvProbeDeform(position,connectedArmWeights,connectedArmCorrective,skinWeight,mx,my,mz,mw,upperM,foreM);
+    vec3 center=pvProbeDeform(position,connectedArmWeights,connectedArmCorrective,skinWeight,skinIndex,mx,my,mz,mw,upperM,foreM);
     int base=gl_VertexID*8;
-    vec3 du=pvProbeDeform(pvProbeTexel(base).xyz,pvProbeTexel(base+2).xyz,pvProbeTexel(base+3).xyz,pvProbeTexel(base+1),mx,my,mz,mw,upperM,foreM)-center;
-    vec3 dv=pvProbeDeform(pvProbeTexel(base+4).xyz,pvProbeTexel(base+6).xyz,pvProbeTexel(base+7).xyz,pvProbeTexel(base+5),mx,my,mz,mw,upperM,foreM)-center;
+    vec3 du=pvProbeDeform(pvProbeTexel(base).xyz,pvProbeTexel(base+2).xyz,pvProbeTexel(base+3).xyz,pvProbeTexel(base+1),skinIndex,mx,my,mz,mw,upperM,foreM)-center;
+    vec3 dv=pvProbeDeform(pvProbeTexel(base+4).xyz,pvProbeTexel(base+6).xyz,pvProbeTexel(base+7).xyz,pvProbeTexel(base+5),skinIndex,mx,my,mz,mw,upperM,foreM)-center;
     vec3 surfaceNormal=cross(du,dv);
     if(dot(surfaceNormal,surfaceNormal)>1e-12)objectNormal=normalize(mix(objectNormal,normalize(surfaceNormal),socketNormalBlend));
   }
@@ -191,7 +191,7 @@ pvArmSurface(transformed, normal, connectedArmWeights, pawPosition, pawUnusedNor
 transformed=pawPosition;
 if(pawDQ){
   transformed=pvRotateQ(pawReal,transformed)+2.0*(pawReal.w*pawDual.xyz-pawDual.w*pawReal.xyz+cross(pawReal.xyz,pawDual.xyz));
-  float bendWeight=smoothstep(.95,1.0,connectedArmWeights.x+connectedArmWeights.y);
+  float bendWeight=smoothstep(.95,1.0,min(connectedArmWeights.x+connectedArmWeights.y,dot(skinWeight,step(vec4(3.5),skinIndex))));
   if(bendWeight>0.0){
     bool left=position.x>=0.0;
     mat4 upperM=bindMatrixInverse*getBoneMatrix(left?4.0:6.0)*bindMatrix;
@@ -208,6 +208,6 @@ if(pawDQ){
       // Interpolate smooth vertex normals from deformed tangent probes. Flat
       // fragment derivatives made the shoulder look like stacked rings.
     };
-    material.customProgramCacheKey = () => cache + "-socket-probe-v7";
+    material.customProgramCacheKey = () => cache + "-socket-probe-v8";
   }
 }

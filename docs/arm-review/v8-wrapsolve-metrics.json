@@ -1,0 +1,14 @@
+{
+  "free_vertices": 190,
+  "iterations": 48,
+  "final_change_cm": 9.818182386953877e-06,
+  "max_correction_cm": 8.76096878547034,
+  "active_edge_ratio_percentiles": [
+    0.44061826283813504,
+    0.7759674536610861,
+    0.9856799553386365,
+    1.39383426725749,
+    1.7665606282315254
+  ],
+  "torso_max_offset": 0.0
+}

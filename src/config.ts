@@ -266,6 +266,8 @@ export interface Config {
     /** Standing model: topology-derived continuous skin, or legacy spatial weights for comparison. */
     armRig: "legacy" | "connected";
     armRigPath: string;
+    armDeform?: 'surface' | 'cage';
+    armCageRounded?: boolean;
   };
   scene: {
     /** 배경 그라디언트 위/아래 (가이드 KEY COLOR #F55433) */
@@ -560,7 +562,8 @@ export const DEFAULT_CONFIG: Config = {
     elbowGain: 1.0,
     armRaiseMaxRad: 3.0,
     armRig: "connected",
-    armRigPath: "./models/stand_connected_rig.json",
+    armRigPath: "./models/stand_connected_cage_rig.json",
+    armDeform: 'cage',
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,

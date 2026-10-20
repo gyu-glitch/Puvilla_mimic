@@ -18,7 +18,8 @@
     "deploy": "node scripts/deploy.mjs",
     "deploy:preview": "node scripts/deploy.mjs",
     "rig:build": "node scripts/build-standing-rig.mjs",
-    "rig:check": "node --experimental-transform-types scripts/check-standing-rig.mjs"
+    "rig:build:cage": "node scripts/build-standing-rig.mjs --socket-wrap --fair-finish=16 --output=public/models/stand_connected_cage_rig.json",
+    "rig:check": "node --experimental-transform-types scripts/check-standing-rig.mjs && node --experimental-transform-types scripts/check-subdivision-plan.mjs && node --experimental-transform-types scripts/check-cage-surface.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.0",

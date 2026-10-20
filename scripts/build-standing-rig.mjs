@@ -7,6 +7,7 @@ import { socketCorrective } from './standing-socket-corrective.mjs';
 const source = readFileSync('public/models/pu_stand.obj', 'utf8');
 const socketWidth=Number(process.argv.find(a=>a.startsWith('--socket-width='))?.split('=')[1]??18);
 const socketRise=Number(process.argv.find(a=>a.startsWith('--socket-rise='))?.split('=')[1]??1);
+const socketWrap=process.argv.includes('--socket-wrap');
 if(!Number.isFinite(socketRise)||socketRise<0||socketRise>15)throw new Error('Socket rise must be 0..15 cm');
 if(!Number.isFinite(socketWidth)||socketWidth<6||socketWidth>30)throw new Error('Socket width must be 6..30 cm');
 const mesh = parseObj(source).find(m => m.name === 'pu_body');
@@ -69,8 +70,9 @@ for(const side of [-1,1]){
   // Torso vertices are anchors. Blend on the arm side of the socket only;
   // raising a hand must not pull the belly or flank into the shoulder.
   let w=arm.has(i)? smooth(0,socketWidth,da[i]) : 0;
+  if(socketWrap)w=arm.has(i)?smooth(-8,8,da[i]):smooth(-8,8,-dt[i])*smooth(84,96,P[i][1]);
   if(!Number.isFinite(w))w=0;
-  w*=smooth(15,22,Math.abs(P[i][0]))*(1-smooth(110,119,P[i][1]));
+  w*=smooth(15,22,Math.abs(P[i][0]))*(1-smooth(socketWrap?119:110,socketWrap?128:119,P[i][1]));
   weights[i][side>0?0:1]=w;
   if(arm.has(i))weights[i][2]=w*smooth(.34,.68,da[i]/max);
  }
@@ -102,8 +104,13 @@ if(sections){
 const finishPasses=Number(process.argv.find(a=>a.startsWith('--fair-finish='))?.split('=')[1]??8);
 if(!Number.isInteger(finishPasses)||finishPasses<0||finishPasses>40)throw new Error('Fair finish must be 0..40');
 const corrective=socketCorrective(P,neighbors,weights,joints,false,finishPasses);
-const torsoAnchors=P.map((_,i)=>i).filter(i=>!armInterior.has(i));
+const torsoAnchors=P.map((_,i)=>i).filter(i=>socketWrap?weights[i][0]+weights[i][1]===0:!armInterior.has(i));
 const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints,corrective,torsoAnchors};
+if(socketWrap){
+ data.deformation='pose-first-cage';
+ data.shoulderSkin=P.map((_,i)=>i).filter(i=>!armInterior.has(i)&&weights[i][0]+weights[i][1]>0);
+ data.buildOptions={socketWrap:true,finishPasses,socketRise};
+}
 const suffix=process.argv.includes('--portrait')?'_portrait':process.argv.includes('--sections')?'_sections':process.argv.includes('--legacy')?'_legacy':'';
 const output=process.argv.find(a=>a.startsWith('--output='))?.slice(9)??`public/models/stand_connected_rig${suffix}.json`;
 writeFileSync(output,JSON.stringify(data));
