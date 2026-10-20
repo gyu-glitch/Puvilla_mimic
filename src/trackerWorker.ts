@@ -52,7 +52,7 @@ self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
         const height = "videoHeight" in image ? image.videoHeight : image.height;
         return toRawFaces(res, width, height, transpose);
       });
-      self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0, epoch: d.epoch });
+      self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0, epoch: d.epoch, ts: d.ts });
     } catch (err) {
       self.postMessage({ type: "result", faces: null, inferenceMs: 0, msg: String(err), epoch: d.epoch });
     } finally {

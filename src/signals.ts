@@ -48,6 +48,7 @@ export class SignalProcessor {
 
   private near = false;
   private lastSeenMs = -Infinity;
+  private lastObservationMs = -Infinity;
   private lockMissSinceMs = 0; // 락온 대상을 못 찾기 시작한 시각
   private lastFaces: RawFace[] = [];
   private lastTargetBox: RawFace["bbox"] | null = null;
@@ -185,12 +186,19 @@ export class SignalProcessor {
     const t = nowMs / 1000;
     const p = this.cfg.presence;
     const mirror = this.cfg.camera.mirror ? -1 : 1;
-    this.lastFaces = track.faces;
+    const observedAt = track.observedAtMs ?? nowMs;
+    const fresh = track.observedAtMs === undefined || observedAt > this.lastObservationMs;
+    if (fresh) this.lastObservationMs = observedAt;
+    const age = nowMs - observedAt;
+    const timely = Number.isFinite(age) && age >= 0 && age < p.faceLostHoldMs;
+    // Repeated renders of a cached result are not new camera observations.
+    // Show a held outline when inference itself stalls, without extending lock.
+    this.lastFaces = timely && age < 250 ? track.faces : [];
     const aspect = Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : 1;
-    const target = this.pickTarget(track.faces, nowMs, aspect);
+    const target = fresh && timely ? this.pickTarget(track.faces, nowMs, aspect) : null;
 
     if (target) {
-      this.lastSeenMs = nowMs;
+      this.lastSeenMs = observedAt;
       if (this.cfg.mapping.autoNeutral) this.neutral.update(target, nowMs);
       const yaw = this.fYaw.filter(target.yaw * mirror, t);
       const pitch = this.fPitch.filter(this.cfg.mapping.autoNeutral ? this.neutral.pitch(target.pitch) : target.pitch, t);
@@ -252,7 +260,7 @@ export class SignalProcessor {
         this.resetFilters();
         this.sig = { ...emptySignal(), faceCount: 0 };
       } else {
-        this.sig = { ...this.sig, faceCount: 0 };
+        this.sig = { ...this.sig, faceCount: fresh ? 0 : this.lastFaces.length };
       }
     }
     return this.sig;

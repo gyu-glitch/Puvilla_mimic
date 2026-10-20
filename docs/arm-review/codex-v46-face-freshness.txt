@@ -1,0 +1,32 @@
+
+> pubilla-mimic-codex@0.1.0 face:freshness:check
+> node --experimental-transform-types scripts/check-face-freshness.mjs
+
+[14:57:54.476] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.478] [state] IDLE → ENTER
+[14:57:54.479] [state] ENTER → MIMIC
+[14:57:54.482] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.482] [state] IDLE → ENTER
+[14:57:54.483] [state] ENTER → MIMIC
+[14:57:54.483] [state] MIMIC → EXIT
+[14:57:54.483] [state] EXIT → IDLE
+[14:57:54.483] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.483] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.484] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.486] [signal] lock on h=0.20 cx=0.50 (후보 1명)
+[14:57:54.489] [signal] lock on h=0.30 cx=0.50 (후보 1명)
+[
+  {
+    "fixed": false,
+    "present": true,
+    "target": true,
+    "state": "MIMIC"
+  },
+  {
+    "fixed": true,
+    "present": false,
+    "target": false,
+    "state": "IDLE"
+  }
+]
+PASS: frozen main-video/cached result, late worker-style result, no stale reacquisition, short gaps, normal 6/15/30Hz, resume, inference exception

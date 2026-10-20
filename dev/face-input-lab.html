@@ -8,12 +8,13 @@ import {loadConfig} from '/src/config.ts';
 import {SignalProcessor} from '/src/signals.ts';
 import {MimicStateMachine} from '/src/state.ts';
 const file=document.querySelector('#fixture'),status=document.querySelector('#status'),results=document.querySelector('#results');
+const region=()=>file.files[0].name.includes('7668')?[494,1082,300,150]:[520,965,350,165];
 document.querySelector('#pipeline').onclick=async()=>{
  try{
  results.replaceChildren();status.textContent='실제 트래커 초기화';
  const bitmap=await createImageBitmap(file.files[0]);
- const source=document.createElement('canvas');source.width=350;source.height=165;
- const ctx=source.getContext('2d');ctx.drawImage(bitmap,520,965,350,165,0,0,350,165);bitmap.close();
+ const rect=region(),source=document.createElement('canvas');source.width=rect[2];source.height=rect[3];
+ const ctx=source.getContext('2d');ctx.drawImage(bitmap,...rect,0,0,source.width,source.height);bitmap.close();
  results.append(source);
  const rows=[];
  for(const worker of [false,true]){
@@ -22,27 +23,27 @@ document.querySelector('#pipeline').onclick=async()=>{
  cfg.presence.lockZone={x:0,y:0,w:1,h:1};
  const tracker=new FaceTracker(cfg.tracker);await tracker.init();
  const signal=new SignalProcessor(cfg),fsm=new MimicStateMachine(cfg);
- let count=0,locked=0,last=null,activeFrames=0;
- for(let i=0;i<90;i++){
+ let count=0,locked=0,last=null,activeFrames=0,firstLockMs=null;const began=performance.now(),frameCount=180;
+ for(let i=0;i<frameCount;i++){
  const now=performance.now(),track=tracker.update({readyState:4,currentTime:i/30},now,source);
  const s=signal.update(track,now,source.width/source.height);
  if(fsm.update(s,now).state==='MIMIC')activeFrames++;
- if(track.faces.length)count++;if(signal.debugFaces.some(f=>f.locked))locked++;
+ if(track.faces.length)count++;if(signal.debugFaces.some(f=>f.locked)){locked++;if(firstLockMs===null)firstLockMs=Math.round(now-began);}
  if(track.faces.length)last=track.faces[0].bbox;
  await new Promise(r=>setTimeout(r,33));
  }
- const blank=document.createElement('canvas');blank.width=350;blank.height=165;
- blank.getContext('2d').fillRect(0,0,350,165);
+ const blank=document.createElement('canvas');blank.width=source.width;blank.height=source.height;
+ blank.getContext('2d').fillRect(0,0,blank.width,blank.height);
  let blankFaces=0,blankPresent=true;
- for(let i=90;i<165;i++){
+ for(let i=frameCount;i<frameCount+75;i++){
  const now=performance.now(),track=tracker.update({readyState:4,currentTime:i/30},now,blank);
- const s=signal.update(track,now,350/165);
- if(i>=150)blankFaces+=track.faces.length;
+ const s=signal.update(track,now,source.width/source.height);
+ if(i>=frameCount+60)blankFaces+=track.faces.length;
  blankPresent=s.present;
  await new Promise(r=>setTimeout(r,33));
  }
- rows.push({requestedWorker:worker,mode:tracker.mode,detectedFrames:count,lockedFrames:locked,activeFrames,last,blankFaces,blankPresent});
- tracker.close();status.textContent=JSON.stringify(rows,null,2);
+ rows.push({requestedWorker:worker,mode:tracker.mode,frameCount,firstLockMs,detectedFrames:count,lockedFrames:locked,activeFrames,last,blankFaces,blankPresent});
+ tracker.close();const shown=document.createElement('canvas');shown.width=source.width;shown.height=source.height;const sc=shown.getContext('2d');sc.drawImage(source,0,0);if(last){sc.strokeStyle='lime';sc.lineWidth=2;sc.strokeRect(last.x*shown.width,last.y*shown.height,last.w*shown.width,last.h*shown.height);}results.append(shown);status.textContent=JSON.stringify(rows,null,2);
  }
  }catch(e){status.textContent=String(e);throw e;}
 };

@@ -1,0 +1,53 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8"><title>입력 정지·복귀 실제 렌더</title>
+<style>body{margin:0;color:white;font:14px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>합성 입력 0–8초 들기/인사/내리기 → 8–12초 입력 정지 → 복귀
+<button id="before">수정 전</button><button id="after">수정 후</button>
+<select id="view"><option value="0">정면</option><option value="-45">사선</option><option value="-90">측면</option></select>
+<button id="record">16초 영상 저장</button><button id="freeze">정지 4초 결과</button><div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal,NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {BodyProcessor} from '/src/body.ts';
+import {armSessionFixture} from '/dev/arm-session-fixture.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {SignalProcessor as Before} from '/dev/signals-before-v46.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();cfg.presence.mimicOnLock=true;cfg.scene.outputMirror=false;cfg.scene.layout='landscape';cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let corrected=true,processor,fsm,bodyProc,start,last=performance.now(),track,lastSample=-1,freeze=false;
+function reset(){processor=new(corrected?SignalProcessor:Before)(cfg);fsm=new MimicStateMachine(cfg);bodyProc=new BodyProcessor(cfg);start=performance.now();track={faces:[],inferenceMs:0};lastSample=-1;freeze=false;}
+reset();
+for(const [id,fixed] of [['before',false],['after',true]])document.querySelector('#'+id).onclick=()=>{corrected=fixed;reset();};
+document.querySelector('#view').onchange=e=>{ch.root.rotation.y=Number(e.target.value)*Math.PI/180;};
+const face=(t)=>({bbox:{x:.44,y:.21,w:.12,h:.182,cx:.5,cy:.301},yaw:25*Math.sin(t*.8),pitch:24,roll:0,blend:{},mouth:{open:.12,corner:.02},eyes:{left:.16,right:.16}});
+function inputs(t,now){
+ const live=t<8||t>=12,sample=Math.floor(t*30),fresh=live&&sample!==lastSample;
+ if(fresh){lastSample=sample;track={faces:[face(t)],inferenceMs:10,observedAtMs:now};}
+ const sig=processor.update(track,now,16/9);
+ const phase=t%8,sourceTime=phase<2?phase:phase<5?3:phase<7?16+(phase-5):19;
+ const raw=armSessionFixture(sourceTime,true).raw;
+ if(phase>2&&phase<5){for(const id of [15,16]){raw.world[id].x+=.035*Math.sin(phase*5);raw.image[id].x+=.035*Math.sin(phase*5)*.65/(16/9);}}
+ const body=bodyProc.update(live?raw:null,fresh,now);const state=fsm.update(sig,now,body!==null);
+ return {sig,body,state,live};
+}
+document.querySelector('#freeze').onclick=()=>{reset();for(let i=0;i<=719;i++)inputs(i/60,start+i*1000/60);freeze=true;};
+document.querySelector('#record').onclick=()=>{
+ reset();const chunks=[],stream=scene.renderer.domElement.captureStream(24),recorder=new MediaRecorder(stream,{mimeType:'video/webm'});
+ recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+ recorder.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`codex-v46-input-${corrected?'after':'before'}-${document.querySelector('#view').value}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);stream.getTracks().forEach(t=>t.stop());};recorder.start();setTimeout(()=>recorder.stop(),16000);
+};
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ const t=freeze?11.99:Math.min(15.99,(now-start)/1000);
+ const sampleNow=freeze?start+11990:now;
+ const {sig,body,state,live}=inputs(t,sampleNow);
+ ch.setState(state);ch.apply(state.state==='MIMIC'||state.state==='ENTER'?mapSignal(sig,cfg.mapping):NEUTRAL_PARAMS,dt,now/1000,body);scene.render();
+ document.querySelector('#status').textContent=`${corrected?'수정 후':'수정 전'} | ${t.toFixed(2)}초 | 입력 ${live?'진행':'정지'} | ${state.state} | 얼굴 ${sig.present} | LOCK ${!!processor.target} | arm ${body?.armL??0}`;
+ requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+</script></body></html>

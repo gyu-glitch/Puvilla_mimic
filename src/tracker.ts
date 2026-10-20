@@ -32,6 +32,8 @@ export interface RawFace {
 export interface TrackResult {
   faces: RawFace[];
   inferenceMs: number;
+  /** Main-thread monotonic time of the input frame, not its worker delivery. */
+  observedAtMs?: number;
 }
 
 const _m = new THREE.Matrix4();
@@ -133,7 +135,7 @@ export class FaceTracker {
       this.busy = false;
       if (d.epoch !== this.inputEpoch) return;
       this.resultTimes.push(performance.now());
-      if (d.faces) this.lastResult = { faces: d.faces as RawFace[], inferenceMs: d.inferenceMs };
+      if (d.faces) this.lastResult = { faces: d.faces as RawFace[], inferenceMs: d.inferenceMs, observedAtMs: d.ts };
     };
   }
 
@@ -182,7 +184,7 @@ export class FaceTracker {
       const epoch = this.inputEpoch;
       this.busy = true;
       createImageBitmap(input).then(
-        (bitmap) => w.postMessage({ type: "frame", bitmap, ts: performance.now(), epoch }, [bitmap]),
+        (bitmap) => w.postMessage({ type: "frame", bitmap, ts: nowMs, epoch }, [bitmap]),
         () => (this.busy = false),
       );
       return this.lastResult;
@@ -204,7 +206,7 @@ export class FaceTracker {
     }
     const inferenceMs = performance.now() - t0;
 
-    this.lastResult = { faces, inferenceMs };
+    this.lastResult = { faces, inferenceMs, observedAtMs: nowMs };
     return this.lastResult;
   }
 

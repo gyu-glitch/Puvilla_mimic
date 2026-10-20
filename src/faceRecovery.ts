@@ -77,10 +77,7 @@ export class FaceRecovery {
     this.mode = "search";
     if (now - this.lastSearch < 250) return [];
     this.lastSearch = now;
-    const size = Math.min(width, height);
-    // Center, then both ends: recover across landscape and portrait sources.
-    const offset = [0.5, 0, 1][this.nextTile++ % 3];
-    const crop = { x: (width - size) * offset, y: (height - size) * offset, size };
+    const crop = recoverySearchCrop(width, height, this.nextTile++);
     const faces = this.scan(input, crop, infer);
     if (faces.length) { this.crop = crop; this.lastCropSeen = now; }
     return faces;
@@ -100,6 +97,21 @@ export class FaceRecovery {
     if (faces.length) this.mode = "recovery";
     return faces.map(f => remapRecoveryFace(f, crop, this.width, this.height));
   }
+}
+
+/** Search broad regions first, then overlapping enlarged views. Small venue
+ * faces can be invisible to the detector even in a full-height square.
+ * This covers the whole input rather than assuming a fixed visitor location. */
+export function recoverySearchCrop(width: number, height: number, index: number): Crop {
+  const tile = index % 12;
+  const size = Math.min(width, height) * (tile < 3 ? 1 : 0.75);
+  if (tile < 3) {
+    const offset = [0.5, 0, 1][tile];
+    return { x: (width - size) * offset, y: (height - size) * offset, size };
+  }
+  const x = [0.5, 0, 1][(tile - 3) % 3];
+  const y = [0, 0.5, 1][Math.floor((tile - 3) / 3)];
+  return { x: (width - size) * x, y: (height - size) * y, size };
 }
 
 /** Geometric deduplication only; identity/lock association remains downstream. */

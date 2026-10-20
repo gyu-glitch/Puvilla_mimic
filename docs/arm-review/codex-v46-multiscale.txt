@@ -1,0 +1,5 @@
+
+> pubilla-mimic-codex@0.1.0 face:multiscale:check
+> node --experimental-transform-types scripts/check-face-multiscale.mjs
+
+PASS: 4 input aspects × 9 enlarged positions, full-frame coordinates, complete coverage, next-frame follow, bounded 12-pass search
