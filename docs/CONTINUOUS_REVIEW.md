@@ -521,3 +521,14 @@
 - dev/face-lock-lab.html에서 같은 합성 이동+고개 회전을 실제 SignalProcessor/상태머신/캐릭터로 렌더했다. 이전은 LOCK false와 추적cx .5로 고개가 정면에 머물고, 수정은 LOCK true와cx .6으로 고개 회전이 전달된다. codex-v38-lock-{before,after}.png, 콘솔 오류0. 현장 카메라 검출 빈도/오인식률을 측정한 검사는 아니다.
 - 공개 배포 직후의 후속 오류 수정으로 개발/공개 **codex-20261020-124504** 반영. 공개 codex-promoted-20261020-124504, 62개 복사 파일 일치, v37 및 current.before-codex-v38.txt 보존. 외부 config.build 확인. 주소 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-124504 .
 - 남은 확인: 실제 OBS에서 락 유지와 다인 등장. 검출 자체가 오래 사라지는 조명/각도 문제나 카메라 처리 지연은 이번 합성 검증만으로 해결됐다고 판단하지 않는다. 리그/메쉬/높이/팔 조건은 미변경.
+
+## v39 입력 90도 순환 회전
+
+- 사용자: 팔이 세로 입력 밖으로 잘리므로 반시계90도 회전이 필요하며, 후속 지시로90도씩 계속 순환하는 기능을 요청했다. 기존 출력 ↔와 별도로 좌하단 ↶ 버튼 추가. 0→90→180→270→0도, 각도 표시, 브라우저에 저장. 새로고침 없이 적용한다.
+- src/cameraInput.ts에서 원본 video 전체를 canvas로 회전한다.90/270도는 폭/높이 교환, 원본 전체 픽셀 보존. CSS 회전만 적용하는 방식이 아니다. 같은 canvas를 FaceTracker 메인/워커, PoseTracker, LockZoneEditor 미리보기에 전달한다. 카메라 원본 트랙은 그대로 유지하여 노출 조절과 연결 종료 감지는 기존 동작을 사용한다. 좌우 미러는 회전 뒤 기존 표시/신호 규칙대로 적용한다.
+- video.currentTime 기반 새 프레임 검사 유지, 입력 캔버스는 새 프레임 또는 회전/해상도 변경 때만 다시 그린다. 회전/원본 해상도 변화 시 얼굴/상반신 캐시, 신호 스무딩, 타깃/상태머신을 초기화한다. 워커 프레임에 epoch를 부여해 회전 직전 늦게 도착한 추론 결과를 버린다.
+- 카메라 시작 검사, camera:rotation:check, presence:check, typecheck/build 통과. 회전 검사에서는 실제 FaceTracker/PoseTracker 코드에 가짜 추론 엔진을 연결하여 회전 canvas 전달, 바뀐 imageAspect, 중복 프레임 제한, 회전 시 같은 videoTime에서도 새 추론, 워커의 오래된 결과 폐기를 확인했다. 실제 MediaPipe 사람 검출 정확도를 측정한 테스트는 아니다.
+- dev/camera-output-lab.html의 실제 CanvasCaptureMediaStream→video→CameraInput→LockZoneEditor로4방향 UI 순환을 확인했다. 비대칭 모서리 색의 회전 픽셀 검사 통과. 360×640은90/270도에서640×360,0/180도에서360×640. 위/아래 표식이 모두 보존된다. codex-v39-input-{0,90,180,270}.png / mobile.png 보존. 모바일390×844 버튼 접근 확인, 콘솔 오류0.
+- 로컬 배포 빌드에서90도 선택 후 reload에도90도 유지 확인. 검증 후 해당 테스트 브라우저 설정은 원래0도로 복원했다. 사용자의 실제 OBS/카메라는 켜거나 촬영하지 않았다.
+- 개발/공개 **codex-20261020-125513** 반영. 공개 codex-promoted-20261020-125513,62개 복사 파일 일치, v38과 current.before-codex-v39.txt 보존. 외부 config.build 및 공개 ↶ 버튼 확인. 주소 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-125513 .
+- 한계/다음: 실제 OBS 입력에서 사람이 똑바로 서는 각도로 선택 후 얼굴/팔 추론 확인. OBS 단계에서 이미 잘라버린 픽셀은 회전으로 복구되지 않는다. 전체 해상도 canvas 복사 비용과 현장 추론 속도는 별도 관찰 대상이다. 이번에 캐릭터 형상/리깅/웨이트/높이는 변경하지 않았다.

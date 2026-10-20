@@ -60,7 +60,7 @@ export class PoseTracker {
     return this.cfg.modelUrlFallback;
   }
 
-  update(video: HTMLVideoElement, nowMs: number): PoseResult {
+  update(video: HTMLVideoElement, nowMs: number, input: HTMLCanvasElement | HTMLVideoElement = video): PoseResult {
     if (!this.landmarker || video.readyState < 2) return { ...this.last, fresh: false };
     if (video.currentTime === this.lastVideoTime) return { ...this.last, fresh: false };
     this.lastVideoTime = video.currentTime;
@@ -70,7 +70,7 @@ export class PoseTracker {
     const t0 = performance.now();
     let res: PoseLandmarkerResult;
     try {
-      res = this.landmarker.detectForVideo(video, nowMs);
+      res = this.landmarker.detectForVideo(input, nowMs);
     } catch (e) {
       log.error("pose", `detectForVideo 실패: ${String(e)}`);
       return { ...this.last, fresh: false };
@@ -80,7 +80,7 @@ export class PoseTracker {
       return {
         world: w.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 })),
         image: lm.map((p) => ({ x: p.x, y: p.y })),
-        imageAspect: video.videoWidth/video.videoHeight,
+        imageAspect: "videoWidth" in input ? input.videoWidth/input.videoHeight : input.width/input.height,
         nose: { x: lm[0].x, y: lm[0].y },
         shoulderW: Math.hypot(lm[11].x - lm[12].x, lm[11].y - lm[12].y),
       };
@@ -91,6 +91,12 @@ export class PoseTracker {
       fresh: true,
     };
     return this.last;
+  }
+
+  resetInput(): void {
+    this.last = { poses: [], inferenceMs: 0, fresh: false };
+    this.lastVideoTime = -1;
+    this.frameCounter = 0;
   }
 
   close(): void {

@@ -1,6 +1,7 @@
 import type { Config } from "./config";
 import type { Scene } from "./scene";
 import type { Backdrop } from "./backdrop";
+import { quarterTurn } from "./cameraInput";
 
 /**
  * 보는 사람용 시점 조작 (키오스크 제외):
@@ -82,6 +83,25 @@ export function setupViewControls(
     onChange();
   };
   document.body.appendChild(mirrorBtn);
+
+  const rotationBtn = btn.cloneNode() as HTMLButtonElement;
+  rotationBtn.id = "inputRotationToggle";
+  rotationBtn.setAttribute("aria-label", "카메라 입력 반시계 90도 회전");
+  const paintRotation = () => {
+    const angle = quarterTurn(full.camera.inputRotation);
+    rotationBtn.title = `카메라 입력 ${angle}° — 누르면 반시계 90° 회전`;
+    rotationBtn.innerHTML = `<span style="font-size:23px;line-height:21px;color:white">↶<small style="display:block;font-size:9px;line-height:10px">${angle}°</small></span>`;
+    rotationBtn.style.opacity = angle ? ".95" : ".6";
+  };
+  paintRotation();
+  rotationBtn.addEventListener("pointerdown", e => e.stopPropagation());
+  rotationBtn.onclick = e => {
+    e.stopPropagation();
+    full.camera.inputRotation = quarterTurn(full.camera.inputRotation + 90);
+    paintRotation();
+    onChange();
+  };
+  document.body.appendChild(rotationBtn);
 
   // 전체화면 버튼 (Fullscreen API 지원하는 브라우저만 — 아이폰 Safari 는 없음 → 홈 화면에 추가로 전체화면)
   const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
@@ -297,6 +317,8 @@ export function setupViewControls(
     mirrorBtn.style.left = `calc(${window.innerWidth < 560 ? 12 : canFull ? 156 : 108}px + env(safe-area-inset-left, 0px))`;
     mirrorBtn.style.bottom = window.innerWidth < 560
       ? `calc(${60 + hiddenBelow}px + env(safe-area-inset-bottom, 0px))` : btn.style.bottom;
+    rotationBtn.style.left = `calc(${window.innerWidth < 560 ? 60 : canFull ? 204 : 156}px + env(safe-area-inset-left, 0px))`;
+    rotationBtn.style.bottom = mirrorBtn.style.bottom;
     fBtn.style.bottom = btn.style.bottom;
     outfitBtns.forEach(([b], i) => {
       b.style.left = "auto";

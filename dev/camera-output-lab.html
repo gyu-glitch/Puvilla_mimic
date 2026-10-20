@@ -14,8 +14,10 @@ import {NEUTRAL_PARAMS} from '/src/character/mapping.ts';
 import {standingWavePose} from '/src/standingWave.ts';
 import {LockZoneEditor} from '/src/lockZone.ts';
 import {setupViewControls} from '/src/viewControls.ts';
+import {CameraInput,drawCameraInput} from '/src/cameraInput.ts';
 const cfg=await loadConfig();
 cfg.body.enabled=true;cfg.character.idleBreathAmp=0;cfg.scene.outputMirror=false;
+cfg.camera.inputRotation=0;cfg.camera.mirror=false;
 cfg.scene.layout='landscape';cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
 const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
 const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
@@ -39,7 +41,22 @@ function drawSource(){
  ctx.textAlign='right';ctx.fillText('R',w-15,h/2+45);
 }
 drawSource();video.srcObject=source.captureStream(15);await video.play();
-const editor=new LockZoneEditor(cfg,video,true);
+const input=new CameraInput(video,cfg.camera);
+const editor=new LockZoneEditor(cfg,input.canvas,true);
+// Pixel assertions run in the page against the production rotation function.
+const corners=document.createElement('canvas');corners.width=40;corners.height=80;
+const cg=corners.getContext('2d');
+for(const [color,x,y] of [['#f00',0,0],['#0f0',20,0],['#00f',0,40],['#ff0',20,40]]){
+ cg.fillStyle=color;cg.fillRect(x,y,20,40);
+}
+const check=document.createElement('canvas');
+const expected=[[255,0,0],[0,255,0],[255,255,0],[0,0,255]];
+for(const [i,angle] of [0,90,180,270].entries()){
+ drawCameraInput(check,corners,40,80,angle);
+ const pixel=[...check.getContext('2d').getImageData(5,5,1,1).data].slice(0,3);
+ if(pixel.join()!==expected[i].join())throw new Error('Wrong rotation at '+angle);
+ if(check.width!==(i%2?80:40)||check.height!==(i%2?40:80))throw new Error('Wrong dimensions');
+}
 for(const [id,w,h] of [['portrait',360,640],['landscape',640,360],['square',480,480]]){
  document.querySelector('#'+id).onclick=()=>{source.width=w;source.height=h;drawSource();};
 }
@@ -47,11 +64,11 @@ const pose=standingWavePose(0,1,1),face={...NEUTRAL_PARAMS,headYaw:.15};
 let last=performance.now();
 function frame(now){
  const dt=Math.min(.05,(now-last)/1000);last=now;
- drawSource();editor.draw([]);
+ drawSource();input.update();editor.draw([]);
  ch.setState({state:'MIMIC',elapsedMs:1000,progress:1});ch.apply(face,dt,0,pose);scene.render();
- const box=video.getBoundingClientRect();
+ const box=input.canvas.getBoundingClientRect();
  document.querySelector('#status').textContent=
-  `입력 ${video.videoWidth}×${video.videoHeight} / 표시 ${box.width.toFixed(1)}×${box.height.toFixed(1)} / 출력 반전 ${cfg.scene.outputMirror?'ON':'OFF'}`;
+  `원본 ${video.videoWidth}×${video.videoHeight} → 인식 ${input.canvas.width}×${input.canvas.height} / 입력 회전 ${cfg.camera.inputRotation}° / 표시 ${box.width.toFixed(1)}×${box.height.toFixed(1)} / 4방향 픽셀 검사 PASS`;
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

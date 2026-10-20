@@ -29,7 +29,7 @@ export class LockZoneEditor {
   /** 드래그를 놓았을 때 (자동 저장용) */
   onChange: (() => void) | null = null;
 
-  constructor(private cfg: Config, video: HTMLVideoElement, hasCamera: boolean) {
+  constructor(private cfg: Config, video: HTMLVideoElement | HTMLCanvasElement, hasCamera: boolean) {
     this.wrap = document.createElement("div");
     this.wrap.id = "camWrap";
     this.wrap.style.cssText =
@@ -43,8 +43,10 @@ export class LockZoneEditor {
       video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;border:0;border-radius:0;opacity:1";
       view.appendChild(video);
       const fitSource = () => {
-        if (!video.videoWidth || !video.videoHeight) return;
-        const aspect = video.videoWidth / video.videoHeight;
+        const width = "videoWidth" in video ? video.videoWidth : video.width;
+        const height = "videoHeight" in video ? video.videoHeight : video.height;
+        if (!width || !height) return;
+        const aspect = width / height;
         view.style.aspectRatio = String(aspect);
         // Limit height as well as width so portrait footage and controls fit.
         this.wrap.style.width = `min(42vw,420px,${50 * aspect}vh)`;

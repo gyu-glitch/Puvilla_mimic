@@ -12,6 +12,8 @@ export interface Config {
     height: number;
     frameRate: number;
     mirror: boolean;
+    /** 추론 전 입력 픽셀을 반시계 방향으로 회전 (0/90/180/270도) */
+    inputRotation: number;
     /** 기기별 노출·밝기 수치를 적용할지 (false = 자동노출만 명시 적용, 나머지는 기기 기본값) */
     applyImageSettings: boolean;
     /** true = 자동 노출(보정값만 조정) / false = 수동 노출 시간 */
@@ -428,7 +430,7 @@ export interface Config {
 export const DEFAULT_CONFIG: Config = {
   build: "dev",
   camera: {
-    deviceLabelIncludes: "", width: 1280, height: 720, frameRate: 30, mirror: true,
+    deviceLabelIncludes: "", width: 1280, height: 720, frameRate: 30, mirror: true, inputRotation: 0,
     applyImageSettings: false, autoExposure: true, exposureTime: 300, exposureCompensation: 0, brightness: 128, contrast: 128, controlsHidden: false,
   },
   tracker: {

@@ -1,6 +1,7 @@
 import "./embedded"; // 단일 HTML 빌드면 내장 파일로 fetch 를 대신함 (가장 먼저)
 import { loadConfig, saveConfig } from "./config";
 import { describeCameraError, openCamera } from "./camera";
+import { CameraInput } from "./cameraInput";
 import { FaceTracker } from "./tracker";
 import { SignalProcessor, emptySignal } from "./signals";
 import { MimicStateMachine } from "./state";
@@ -107,10 +108,11 @@ async function main(): Promise<void> {
     }
   }
 
-  const signals = new SignalProcessor(cfg);
-  const bodyProc = new BodyProcessor(cfg);
-  const bodyTarget = new BodyTargetLock();
-  const fsm = new MimicStateMachine(cfg);
+  const cameraInput = sim ? null : new CameraInput(video, cfg.camera);
+  let signals = new SignalProcessor(cfg);
+  let bodyProc = new BodyProcessor(cfg);
+  let bodyTarget = new BodyTargetLock();
+  let fsm = new MimicStateMachine(cfg);
   const scene = new Scene(document.getElementById("app")!, cfg.scene, cfg.character, cfg.filter);
   // 배경 (가운데 아래 버튼으로 주황 ↔ 겨울 마을) — 키오스크는 공용 설정 그대로 주황
   const backdrop = kiosk ? null : new Backdrop({ top: cfg.scene.bgTop, bottom: cfg.scene.bgBottom });
@@ -170,7 +172,7 @@ async function main(): Promise<void> {
         onSceneChange: () => scene.applyLighting(),
       });
 
-  const zoneEditor = kiosk || touch ? null : new LockZoneEditor(cfg, video, !sim);
+  const zoneEditor = kiosk || touch ? null : new LockZoneEditor(cfg, cameraInput?.canvas ?? video, !sim);
   if (touch) document.body.classList.add("debug-hidden");
   if (!kiosk)
     setupViewControls(cfg, scene, () => (overlay ? overlay.requestSave() : void saveConfig(cfg)), backdrop, (st) => {
@@ -211,17 +213,23 @@ async function main(): Promise<void> {
     const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
     last = now;
 
-    const track = tracker ? tracker.update(video, now) : { faces: [], inferenceMs: 0 };
+    if (cameraInput?.update()) {
+      tracker?.resetInput(); poseTracker?.resetInput();
+      signals = new SignalProcessor(cfg); bodyProc = new BodyProcessor(cfg);
+      bodyTarget = new BodyTargetLock(); fsm = new MimicStateMachine(cfg);
+    }
+    const input = cameraInput?.canvas ?? video;
+    const track = tracker ? tracker.update(video, now, input) : { faces: [], inferenceMs: 0 };
     if (track.inferenceMs !== lastInferMs) {
       inferFrames++;
       lastInferMs = track.inferenceMs;
     }
-    sig = sim ? sim.update(dt) : signals.update(track, now, video.videoWidth / video.videoHeight);
+    sig = sim ? sim.update(dt) : signals.update(track, now, cameraInput!.canvas.width / cameraInput!.canvas.height);
 
     let poseMs = 0;
     if (sim) body = sim.body(now / 1000);
     else if (poseTracker) {
-      const pr = poseTracker.update(video, now);
+      const pr = poseTracker.update(video, now, input);
       poseMs = pr.inferenceMs;
       body = bodyProc.update(bodyTarget.update(pr.poses, signals.target, pr.fresh, now), pr.fresh, now);
     } else body = null;

@@ -18,7 +18,7 @@ type InitMsg = {
   transpose: boolean;
   options: Record<string, unknown>;
 };
-type FrameMsg = { type: "frame"; bitmap: ImageBitmap; ts: number };
+type FrameMsg = { type: "frame"; bitmap: ImageBitmap; ts: number; epoch: number };
 
 self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
   const d = e.data;
@@ -44,9 +44,9 @@ self.onmessage = async (e: MessageEvent<InitMsg | FrameMsg>) => {
       if (!landmarker) throw new Error("not ready");
       const res = landmarker.detectForVideo(d.bitmap, d.ts);
       const faces = toRawFaces(res, d.bitmap.width, d.bitmap.height, transpose);
-      self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0 });
+      self.postMessage({ type: "result", faces, inferenceMs: performance.now() - t0, epoch: d.epoch });
     } catch (err) {
-      self.postMessage({ type: "result", faces: null, inferenceMs: 0, msg: String(err) });
+      self.postMessage({ type: "result", faces: null, inferenceMs: 0, msg: String(err), epoch: d.epoch });
     } finally {
       d.bitmap.close();
     }
