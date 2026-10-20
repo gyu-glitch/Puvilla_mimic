@@ -6,6 +6,8 @@ import { log } from "./logger";
 /** Pose 월드 랜드마크 1명분 (33개, m, 엉덩이 중심 원점, 축은 카메라 이미지 기준: x→오른쪽, y→아래, z→카메라에서 멀어짐) */
 export interface RawPose {
   world: { x: number; y: number; z: number; visibility: number }[];
+  /** Normalized image positions: world coordinates can hallucinate an off-screen wrist. */
+  image?: { x: number; y: number }[];
   /** 이미지 좌표(0~1, 미러 전) 코·어깨 — 얼굴 대상과 같은 사람인지 맞출 때 사용 */
   nose: { x: number; y: number };
   shoulderW: number;
@@ -76,6 +78,7 @@ export class PoseTracker {
       const lm = res.landmarks[i];
       return {
         world: w.map((p) => ({ x: p.x, y: p.y, z: p.z, visibility: p.visibility ?? 0 })),
+        image: lm.map((p) => ({ x: p.x, y: p.y })),
         nose: { x: lm[0].x, y: lm[0].y },
         shoulderW: Math.hypot(lm[11].x - lm[12].x, lm[11].y - lm[12].y),
       };

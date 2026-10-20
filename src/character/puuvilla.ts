@@ -1023,6 +1023,8 @@ export class PuuvillaCharacter implements CharacterRig {
     // ── 팔 ──
     const fa = this.cfg.character;
     const upperContacts=[false,false];
+    const resting=this.arms.map(arm=>!!(this.connectedArms&&mimic&&this.cfg.body.enabled&&
+      (!pose||(arm.side>0?pose.armL:pose.armR)<this.cfg.body.minVisibility)));
     const following=this.arms.map(arm=>!!(this.connectedArms&&this.cfg.body.armFollowPose&&pose&&
       (arm.side>0?pose.armL:pose.armR)>=this.cfg.body.minVisibility));
     for (const arm of this.arms) {
@@ -1040,6 +1042,10 @@ export class PuuvillaCharacter implements CharacterRig {
       if(!pose||conf<this.cfg.body.minVisibility)this.elbowPlanes[arm.side>0?0:1].reset();
       if (pose && conf >= this.cfg.body.minVisibility) {
         this.solveArm(arm, pose, humanTorso, tu, tf, dtSec);
+      } else if (resting[arm.side>0?0:1]) {
+        // Uncertain camera input returns to the supplied model's rest, with no stale contact bend.
+        tu.copy(_qIdle); tf.copy(_qIdleF);
+        this.torsoContact[arm.side>0?0:1].reset();
       } else if (arm.side < 0 && wave > 0) {
         // 손 흔들기: 오른팔(화면 왼쪽)을 들고 아래팔을 까딱
         if (this.armsFree) {
@@ -1087,7 +1093,7 @@ export class PuuvillaCharacter implements CharacterRig {
           this.torsoContact[arm.side>0?0:1].solveLift(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,dtSec,chest.quaternion);
         }
       }
-      if(!follow && this.connectedArms && this.cfg.body.armTorsoClearance){
+      if(!follow && !resting[arm.side>0?0:1] && this.connectedArms && this.cfg.body.armTorsoClearance){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         this.torsoContact[arm.side>0?0:1].solve(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,dtSec,chest.quaternion);
       }
@@ -1106,8 +1112,9 @@ export class PuuvillaCharacter implements CharacterRig {
     for(const arm of this.arms){
       const conf=pose?(arm.side>0?pose.armL:pose.armR):0;
       const contactIndex=arm.side>0?0:1,previousUpper=arm.qUpper.clone(),previousFore=arm.qFore.clone();
-      arm.qUpper.slerp(arm.tUpper, k);
-      arm.qFore.slerp(arm.tFore, k);
+      const armK=resting[contactIndex]?1-Math.exp(-7*dtSec):k;
+      arm.qUpper.slerp(arm.tUpper, armK);
+      arm.qFore.slerp(arm.tFore, armK);
       if(!following[contactIndex] && this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         if(this.cfg.body.armUpperClearance)upperContacts[contactIndex]=resolveStandingUpperContact(j.s,j.h.distanceTo(j.s),arm.restFore,arm.qUpper,arm.qFore,head.quaternion,dtSec)>1e-7||upperContacts[contactIndex];
@@ -1170,7 +1177,7 @@ export class PuuvillaCharacter implements CharacterRig {
           if(wristTarget.lengthSq()>.000001)
             wristTarget.normalize().multiplyScalar(Math.min(.18,arm.restFore.angleTo(palm)));
         }
-        if(this.cfg.body.armPawHold && pose){
+        if(this.cfg.body.armPawHold && pose && conf>=this.cfg.body.minVisibility){
           const tracking=this.pawTracking[i];tracking.update(trackedRoll,handDirection?wristTarget:null,timeSec,dtSec);
           if(this.debugPawTurn===null)target+=tracking.roll*raised;
           wristTarget.copy(tracking.wrist);

@@ -114,12 +114,15 @@ function raw(){
  }return {world,nose:{x:.5,y:.3},shoulderW:.3};
 }
 const cfg=structuredClone(DEFAULT_CONFIG);cfg.camera.mirror=true;
-const processor=new BodyProcessor(cfg),r=raw(),a=processor.update(r,true,1000);
+const processor=new BodyProcessor(cfg),r=raw();
+processor.update(r,true,800);processor.update(r,true,900);
+const a=processor.update(r,true,1000);
 assert.ok(a);assert.ok(a.shoulderL[0]>0&&a.shoulderR[0]<0);
 assert.equal(a.wristR[0],-.5,'mirrored human left wrist must drive screen-left paw');
 const occluded=raw();occluded.world[15].visibility=0;occluded.world[15].x=999;
 const held=processor.update(occluded,true,1100);
-assert.ok(held.wristR.every((v,i)=>Math.abs(v-a.wristR[i])<1e-10),'occluded wrist polluted pose');assert.equal(held.armR,1);assert.equal(held.armL,1);
+assert.ok(held.wristR.every((v,i)=>Math.abs(v-a.wristR[i])<1e-10),'occluded wrist polluted pose');assert.equal(held.armR,0);assert.equal(held.armL,1);
+for(let t=1200;t<=1600;t+=100)processor.update(occluded,true,t);
 const expired=processor.update(occluded,true,1601);assert.equal(expired.armR,0);assert.equal(expired.armL,1);
 const invalid=raw();invalid.world[11].x=NaN;
 assert.ok(processor.update(invalid,true,1650));assert.equal(processor.update(invalid,true,2200),null);
@@ -132,6 +135,7 @@ const handRaw=raw();
 Object.assign(handRaw.world[17],{x:.53,y:-.62,z:-.2});
 Object.assign(handRaw.world[19],{x:.47,y:-.62,z:-.2});
 const handProcessor=new BodyProcessor(cfg);
+handProcessor.update(handRaw,true,800);handProcessor.update(handRaw,true,900);
 const hand=handProcessor.update(handRaw,true,1000);
 assert.ok(hand.handAcrossR[0]>.99,'mirrored raised palm thumb must face toward the head');
 assert.ok(hand.handDirectionR[1]>.99,'wrist-to-fingers must be independent from the tilted forearm');
@@ -164,4 +168,4 @@ for(const edge of [0,3.2,4.6]){
  assert.ok(Math.hypot(...a.handDirectionR.map((v,i)=>v-b.handDirectionR[i]))<.0001,'wave restart popped');
 }
 console.log(`PASS: ${rig.torsoAnchors.length} torso anchors; rigid-paw greeting with settled upper arm, quiet pause and smooth cycle boundaries; mirrored tracking and invalid palm fallback.`);
-console.log(`PASS: original body/scarf hashes; ${torso} fixed torso/head vertices; ${arms} fully weighted arm vertices; symmetric joints; mirrored tracking; independent occlusion hold/release; NaN recovery; face/body association.`);
+console.log(`PASS: original body/scarf hashes; ${torso} fixed torso/head vertices; ${arms} fully weighted arm vertices; symmetric joints; mirrored tracking; independent occlusion release; NaN recovery; face/body association.`);

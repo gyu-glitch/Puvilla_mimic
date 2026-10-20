@@ -73,4 +73,8 @@ export class OneEuroBank {
   reset(): void {
     for (const f of this.filters.values()) f.reset();
   }
+
+  resetPrefix(prefix: string): void {
+    for (const [key, f] of this.filters) if (key.startsWith(prefix)) f.reset();
+  }
 }
