@@ -622,3 +622,18 @@
 - 개발 빌드 **codex-20261020-152321**. 공개 후속 수정으로 같은 immutable 빌드만 승격하고 v46/복구 포인터를 보존한다. 배포 확인은 아래 추가 기록.
 - 다음: 실제 현장의 이동/다인 겹침/고개 숙이기에서 사람 연속성 및 머리 영역이 잘 따라오는지 확인. 사람이 어깨를 옆으로 돌리거나 가리는 경우의 선택/영역 폭, 얼굴 없는 동안 중립표정, 첫 유효 고개 기준의 outlier는 남아 있는 검증 대상이다. 이번 수정을 얼굴 미믹 전체의 합격으로 표현하지 않는다.
 - 공개 승격 완료: **codex-promoted-20261020-152321**,62파일SHA256일치, `current.before-codex-v47.txt`에 v46 보존. 외부 config.build 확인 및 공개 sim 실행/콘솔 오류0 확인. 공개 sim은 실제 현장 카메라 검증이 아니다. Claude 소스와 preview.txt 미수정. 공개 카메라 주소 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-152321 .
+
+## v48 전시 PC 성능 후보 / 로컬 Chrome 앱
+
+- 사용자: 5090에서는 괜찮지만 전시5070에서 최근 버전이 느리다. 12fps 유화 설정을 유지하며 개선판 하나와 웹 기반 로컬 앱의 적합성을 요청했다. 이번 후보는 **개발 codex-20261020-155418**에만 배포. 공개는 v47 codex-promoted-20261020-152321 그대로 보존.
+- 병목: 단일 HTML의 isEmbedded는 얼굴 worker를 비활성화하고 PoseTracker도 메인 스레드 동기 추론이었다. 또한 vendor는12fps마다 칠해도 호출자는 매rAF 3D→HalfFloat/MSAA→합성 원본을 다시 그렸다. 작은 얼굴 보조 영역 실패 시 동일 crop을 한 프레임에 두 번 추론하는 경로도 확인했다.
+- 수정: PaintCadence가 vendor와 같은 floor(t*fps+1e-6) 틀에서 필요한 원본만 렌더한다. 비교split>0이면 노출된 원본을 계속 렌더하고 resize/설정/재활성화는 갱신한다. vendor oil-stroke.js, 리깅/웨이트/메쉬/텍스처/필터 품질 수치는 미변경. 추론과 캐릭터 상태 업데이트를12Hz로 낮추지 않았다.
+- PoseWorker 추가: GPU(초기화 실패 시CPU), 실패하면 기존main 초기화. 동시에1개 입력만 전송하고 큐를 쌓지 않는다. 새 응답은 fresh=true를1회만 전달. 입력 회전epoch가 다른 결과/500ms 이상 오래된 결과 폐기, 비트맵 해제. 얼굴은 기존워커 사용. FaceRecovery는 같은 입력·같은crop의 이미 수행한 관측을 재사용하며 탐색 범위/락 기준은 유지. 얼굴 처리횟수 계측은 inferenceMs 값 변화 대신 관측시각으로 수정.
+- 동일1600×900/14shell/12fps 유화 실제10초 A/B: 기존 원본렌더563회, 수정121회(78.5% 감소). rAF563/564로 각각약56fps, p95 18.1ms로 동일, 50ms초과0. 메인 측정구간 CPU1951.9→1685.0ms(13.7% 감소). **FPS가79% 개선됐다는 뜻이 아니며, GPU시간/5070 실측도 아니다.** `codex-v48-render-performance.json`, `codex-v48-performance.png`, `dev/performance-lab.html`.
+- 실제7668 정지 사진→Pose→사람선택→Face→Signal→FSM230회 검사: 메인 호출에 묶인 합계4180.1→50.6ms. worker의 추론은 별도로 계속 수행되므로 전체 모델계산량99% 감소를 뜻하지 않는다. worker pose관측222회, 수신 시 평균나이48.3ms. 사람105사진구간 중main105/worker97, 얼굴105/95; 워커 첫 사람8번째/얼굴10번째 이후 유지. 두 경로 모두 마지막125빈프레임 후IDLE/사람false/얼굴false. 최종 얼굴박스도 일치. 초기워커 모델워밍업/비동기 지연은 남는다. 현장동영상/5070 검증 아님. 사진은 로컬 선택만 하고 패키지에 넣지 않았다. `codex-v48-worker-performance.json`.
+- 실제 정면/사선/측면10초 유화 영상에서 고개 상하·팔 들기/인사/내리기/원형상 유지 확인(`codex-v48-performance-{front,oblique,side}.webm`, 각jpg프레임시트). 손 측면이 얇은 기존형태 문제의 해결을 주장하지 않는다. 필터 껐다 켜기·패키지/개발URL 렌더 오류0.
+- `performance:check`가12Hz source cadence, split/resize/re-enable, 워커1개제한/한번만fresh/회전epoch/지연응답/close 중bitmap 정리를 검사. person/camera rotation/face recovery·continuity·freshness·multiscale/response/lowering/presence와 전체rig:check 및typecheck/build 통과.
+- 로컬판: **release/Puuvilla-v48-local.zip** (73,882,115 bytes), SHA256 `E1A46FFC9CF6F8A91665B2A2A7423BB0D93824A99C588AE10FD5D9471163E51B`. 압축해제→Start.cmd, 종료는 앱창닫기+Stop.cmd. Chrome 앱창(없으면Edge)과127.0.0.1:4178 서버, Node24.14.1·모든모델·wasm 동봉. Node/npm설치나 실행시CDN 불필요. 공개/다른PC 설정은 자동복사하지 않으며 해당Chrome주소 localStorage에 저장. 시작/중지/재시작 및 패키지의 컴파일된face/pose GPUworker 로컬모델 초기화·실제빈영상추론 확인(`codex-v48-portable-workers.json`). loopback Host/Origin 검증, 읽기전용 정적서버, Stop은PID+실행경로가 같은 자체프로세스만 종료. 런타임/라이브러리 라이선스 동봉.
+- Electron 포장만으로 속도가 개선되는 것은 아니므로, 기존Chrome 엔진에서 worker가 정상 작동하는 로컬HTTP 앱을 선택했다. https://www.electronjs.org/docs/latest/tutorial/process-model 및 https://developers.google.cn/edge/mediapipe/solutions/vision/pose_landmarker/web_js 공식 안내의 동기 추론/worker 권고와 일치. 주된 개선은 포장 자체가 아니라 렌더 스킵과 추론분리다.
+- 다운로드: https://nau-gyuchan.tailc22fe0.ts.net:10000/downloads/Puuvilla-v48-local.zip (HEAD200/길이확인). 실제카메라 개발주소 https://nau-gyuchan.tailc22fe0.ts.net:10000/?v=20261020-155418 .
+- 다음: 5070 현장에서 동일OBS·해상도·12fps·카메라조건으로 비교. 전체화면 해상도/동시OBS GPU부하/브라우저 GPU가속과 워커추론율에 따라 차이 가능. 느린장치에서 기존face worker 자동main전환 조건도 다음프로파일 대상이며 이번에 임의로 제거하지 않았다. 기존 팔/눈/첫pitch기준 정확도 문제는 별개로 남는다.

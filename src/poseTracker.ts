@@ -1,5 +1,5 @@
 import { FilesetResolver, PoseLandmarker, type PoseLandmarkerResult } from "@mediapipe/tasks-vision";
-import { visionFileset } from "./embedded";
+import { isEmbedded, visionFileset } from "./embedded";
 import type { Config } from "./config";
 import { log } from "./logger";
 
@@ -18,6 +18,7 @@ export interface PoseResult {
   poses: RawPose[];
   inferenceMs: number;
   fresh: boolean;
+  observedAtMs?: number;
 }
 
 /**
@@ -29,11 +30,23 @@ export class PoseTracker {
   private lastVideoTime = -1;
   private frameCounter = 0;
   private last: PoseResult = { poses: [], inferenceMs: 0, fresh: false };
+  private worker: Worker | null = null;
+  private busy = false;
+  private pending = false;
+  private epoch = 0;
+  mode = "";
   modelSource = "";
 
   constructor(private cfg: Config["pose"], private wasmPath: string) {}
 
   async init(): Promise<void> {
+    if (this.cfg.useWorker !== false && !isEmbedded && typeof Worker !== "undefined" && typeof createImageBitmap !== "undefined") {
+      try { await this.initWorker(); return; }
+      catch (e) {
+        log.warn("pose", `워커 초기화 실패 → 메인 추론: ${String(e)}`);
+        this.worker?.terminate(); this.worker = null;
+      }
+    }
     const fileset = await visionFileset(this.wasmPath, (w) => FilesetResolver.forVisionTasks(w));
     const modelAssetPath = await this.resolveModelPath();
     this.modelSource = modelAssetPath;
@@ -47,6 +60,40 @@ export class PoseTracker {
       outputSegmentationMasks: false,
     });
     log.info("pose", `PoseLandmarker ready delegate=${this.cfg.delegate} model=${modelAssetPath}`);
+    this.mode = `main-${this.cfg.delegate}`;
+  }
+
+  private async initWorker(): Promise<void> {
+    const modelPath = new URL(await this.resolveModelPath(), location.href).href;
+    const wasmPath = new URL(this.wasmPath.replace(/\/?$/, "/"), location.href).href.replace(/\/$/, "");
+    const worker = new Worker(new URL("./poseWorker.ts", import.meta.url), { type: "module" });
+    this.worker = worker;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("pose worker timeout")), 45000);
+      worker.onerror = e => { clearTimeout(timer); reject(new Error(e.message)); };
+      worker.onmessage = ({ data }) => {
+        if (data.type === "ready") {
+          clearTimeout(timer); this.mode = `worker-${data.delegate}`; resolve();
+        } else if (data.type === "error") {
+          clearTimeout(timer); reject(new Error(data.message));
+        }
+      };
+      worker.postMessage({ type: "init", cfg: this.cfg, modelPath, wasmPath });
+    });
+    this.modelSource = modelPath;
+    worker.onmessage = ({ data }) => {
+      if (data.type !== "result") return;
+      this.busy = false;
+      // Do not revive a lock with a delayed frame or a pre-rotation result.
+      if (data.epoch !== this.epoch || !data.poses || performance.now() - data.ts > 500) return;
+      this.last = { poses: data.poses, inferenceMs: data.inferenceMs, observedAtMs: data.ts, fresh: false };
+      this.pending = true;
+    };
+    worker.onerror = e => {
+      this.busy = false;
+      log.error("pose", `워커 오류: ${e.message}`);
+    };
+    log.info("pose", `PoseLandmarker ready ${this.mode}`);
   }
 
   private async resolveModelPath(): Promise<string> {
@@ -61,6 +108,20 @@ export class PoseTracker {
   }
 
   update(video: HTMLVideoElement, nowMs: number, input: HTMLCanvasElement | HTMLVideoElement = video): PoseResult {
+    if (this.worker) {
+      const result = { ...this.last, fresh: this.pending && nowMs - (this.last.observedAtMs ?? -Infinity) <= 500 };
+      this.pending = false;
+      if (video.readyState < 2 || this.busy || video.currentTime === this.lastVideoTime) return result;
+      this.lastVideoTime = video.currentTime;
+      if (++this.frameCounter % Math.max(1, this.cfg.everyNFrames) !== 0) return result;
+      const worker = this.worker, epoch = this.epoch;
+      this.busy = true;
+      createImageBitmap(input).then(bitmap => {
+        if (worker !== this.worker || epoch !== this.epoch) { bitmap.close(); this.busy = false; return; }
+        worker.postMessage({ type: "frame", bitmap, ts: nowMs, epoch }, [bitmap]);
+      }).catch(e => { this.busy = false; log.warn("pose", String(e)); });
+      return result;
+    }
     if (!this.landmarker || video.readyState < 2) return { ...this.last, fresh: false };
     if (video.currentTime === this.lastVideoTime) return { ...this.last, fresh: false };
     this.lastVideoTime = video.currentTime;
@@ -89,17 +150,24 @@ export class PoseTracker {
       poses,
       inferenceMs: performance.now() - t0,
       fresh: true,
+      observedAtMs: nowMs,
     };
     return this.last;
   }
 
   resetInput(): void {
+    this.epoch++;
+    this.pending = false;
     this.last = { poses: [], inferenceMs: 0, fresh: false };
     this.lastVideoTime = -1;
     this.frameCounter = 0;
   }
 
   close(): void {
+    this.epoch++;
+    this.worker?.terminate();
+    this.worker = null;
+    this.busy = this.pending = false;
     this.landmarker?.close();
     this.landmarker = null;
   }

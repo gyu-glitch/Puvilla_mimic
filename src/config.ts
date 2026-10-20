@@ -240,6 +240,8 @@ export interface Config {
   /** 상반신 미믹 (MediaPipe Pose) */
   pose: {
     enabled: boolean;
+    /** Separate inference from rendering when served over HTTP. */
+    useWorker?: boolean;
     modelPath: string;
     modelUrlFallback: string;
     delegate: "GPU" | "CPU";
@@ -566,6 +568,7 @@ export const DEFAULT_CONFIG: Config = {
   },
   pose: {
     enabled: false, // 상반신 미믹 기본 끔 (켜면 Pose 모델 9MB 추가 로드)
+    useWorker: true,
     modelPath: "./models/pose_landmarker_full.task",
     modelUrlFallback:
       "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",

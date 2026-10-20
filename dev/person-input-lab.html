@@ -41,14 +41,14 @@ document.querySelector('#pipeline').onclick=async()=>{
  blank.getContext('2d').fillRect(0,0,blank.width,blank.height);
  const rows=[];
  for(const worker of [false,true]){
- const cfg=await loadConfig();cfg.pose.modelPath='/models/pose_landmarker_full.task';cfg.tracker.modelPath='/models/face_landmarker.task';cfg.tracker.wasmPath='/mediapipe/wasm';cfg.tracker.useWorker=worker;cfg.presence.lockZone={x:0,y:0,w:1,h:1};
+ const cfg=await loadConfig();cfg.pose.modelPath='/models/pose_landmarker_full.task';cfg.tracker.modelPath='/models/face_landmarker.task';cfg.tracker.wasmPath='/mediapipe/wasm';cfg.tracker.useWorker=worker;cfg.pose.useWorker=worker;cfg.presence.lockZone={x:0,y:0,w:1,h:1};
  const pt=new PoseTracker(cfg.pose,cfg.tracker.wasmPath),ft=new FaceTracker(cfg.tracker);await pt.init();await ft.init();
  const lock=new BodyTargetLock(cfg),fsm=new MimicStateMachine(cfg);let signal=new SignalProcessor(cfg),body=new BodyProcessor(cfg);
  let selectedFrames=0,faceFrames=0,mimic=0,firstPerson=null,firstFace=null,lastBox=null,lastHint=null,finalState=null,blankPresent=null,blankPerson=null,firstPitch=null,pitchRange=[];
- const began=performance.now();
+ const began=performance.now();let blocking=0,poseSamples=0,poseDelay=0;
  for(let i=0;i<230;i++){
  const now=performance.now(),input=i<105?source:blank,video={readyState:4,currentTime:i/30};
- const pr=pt.update(video,now,input),revision=lock.revision,selected=lock.update(pr.poses,signal.target,pr.fresh,now);
+ const callStart=performance.now();const pr=pt.update(video,now,input);if(pr.fresh){poseSamples++;poseDelay+=now-(pr.observedAtMs??now);}const revision=lock.revision,selected=lock.update(pr.poses,signal.target,pr.fresh,now);
  if(lock.revision!==revision){signal=new SignalProcessor(cfg);body=new BodyProcessor(cfg);ft.resetInput();}
  const bp=body.update(selected,pr.fresh,now),hint=lock.headHint(now),tr=ft.update(video,now,input,hint);
  const sig=signal.update(tr,now,source.width/source.height,hint),snap=fsm.update(sig,now,!!hint||!!bp);
@@ -58,9 +58,9 @@ document.querySelector('#pipeline').onclick=async()=>{
  if(snap.state==='MIMIC')mimic++;
  if(hint)lastHint=hint;
  }else{finalState=snap.state;blankPresent=sig.present;blankPerson=!!hint;}
- await new Promise(r=>setTimeout(r,33));
+ blocking+=performance.now()-callStart;await new Promise(r=>setTimeout(r,33));
  }
- rows.push({worker,mode:ft.mode,selectedFrames,faceFrames,mimic,firstPersonFrame:firstPerson,firstFaceFrame:firstFace,lastBox,lastHint,firstPitch,pitchRange:[Math.min(...pitchRange),Math.max(...pitchRange)],finalState,blankPresent,blankPerson});
+ rows.push({worker,poseMode:pt.mode,blockingMs:blocking,poseSamples,meanPoseAgeMs:poseDelay/poseSamples,mode:ft.mode,selectedFrames,faceFrames,mimic,firstPersonFrame:firstPerson,firstFaceFrame:firstFace,lastBox,lastHint,firstPitch,pitchRange:[Math.min(...pitchRange),Math.max(...pitchRange)],finalState,blankPresent,blankPerson});
  const shown=document.createElement('canvas');shown.width=source.width;shown.height=source.height;const ctx=shown.getContext('2d');ctx.drawImage(source,0,0);
  if(lastHint){const h=lastHint.size*shown.height;ctx.strokeStyle='cyan';ctx.strokeRect(lastHint.cx*shown.width-h/2,lastHint.cy*shown.height-h/2,h,h);}
  if(lastBox){ctx.strokeStyle='lime';ctx.strokeRect((lastBox.cx-lastBox.h*shown.height/shown.width/2)*shown.width,(lastBox.cy-lastBox.h/2)*shown.height,lastBox.h*shown.height,lastBox.h*shown.height);}

@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "pose",
+    "delegate": "GPU",
+    "initMs": 317.39999997615814,
+    "result": [],
+    "inferenceMs": 273.90000009536743
+  },
+  {
+    "kind": "face",
+    "delegate": "GPU",
+    "initMs": 239.10000002384186,
+    "result": [],
+    "inferenceMs": 141.90000009536743
+  }
+]

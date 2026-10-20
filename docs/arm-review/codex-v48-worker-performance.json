@@ -1,0 +1,64 @@
+[
+  {
+    "worker": false,
+    "poseMode": "main-GPU",
+    "blockingMs": 4180.1000010967255,
+    "poseSamples": 230,
+    "meanPoseAgeMs": 0,
+    "mode": "main-GPU",
+    "selectedFrames": 105,
+    "faceFrames": 105,
+    "mimic": 101,
+    "firstPersonFrame": 0,
+    "firstFaceFrame": 0,
+    "lastBox": {
+      "cx": 0.5225494469408138,
+      "cy": 0.28771950742782815,
+      "h": 0.14349710407869382
+    },
+    "lastHint": {
+      "cx": 0.5216081738471985,
+      "cy": 0.32381266355514526,
+      "size": 0.3906672440584323
+    },
+    "firstPitch": 19.331811575710343,
+    "pitchRange": [
+      0,
+      0
+    ],
+    "finalState": "IDLE",
+    "blankPresent": false,
+    "blankPerson": false
+  },
+  {
+    "worker": true,
+    "poseMode": "worker-GPU",
+    "blockingMs": 50.59999978542328,
+    "poseSamples": 222,
+    "meanPoseAgeMs": 48.30135135124396,
+    "mode": "worker-GPU",
+    "selectedFrames": 97,
+    "faceFrames": 95,
+    "mimic": 84,
+    "firstPersonFrame": 8,
+    "firstFaceFrame": 10,
+    "lastBox": {
+      "cx": 0.5225494469408138,
+      "cy": 0.28771950742782815,
+      "h": 0.14349710407869382
+    },
+    "lastHint": {
+      "cx": 0.5216081738471985,
+      "cy": 0.32381266355514526,
+      "size": 0.3906672440584323
+    },
+    "firstPitch": 19.331811575710343,
+    "pitchRange": [
+      0,
+      0
+    ],
+    "finalState": "IDLE",
+    "blankPresent": false,
+    "blankPerson": false
+  }
+]

@@ -1,0 +1,30 @@
+{
+  "before": {
+    "optimized": false,
+    "seconds": 10.000799999952317,
+    "rafFrames": 563,
+    "sourceRenders": 563,
+    "mainCpuMs": 1951.9000008106232,
+    "p95FrameMs": 18.10000000000582,
+    "over50ms": 0,
+    "oilFps": 12,
+    "canvas": [
+      1600,
+      900
+    ]
+  },
+  "after": {
+    "optimized": true,
+    "seconds": 10.014399999928472,
+    "rafFrames": 564,
+    "sourceRenders": 121,
+    "mainCpuMs": 1685.0000022649765,
+    "p95FrameMs": 18.10000000000582,
+    "over50ms": 0,
+    "oilFps": 12,
+    "canvas": [
+      1600,
+      900
+    ]
+  }
+}

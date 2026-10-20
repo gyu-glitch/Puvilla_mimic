@@ -234,9 +234,9 @@ async function main(): Promise<void> {
     } else body = null;
     const hint = bodyTarget.headHint(now);
     const track = tracker ? tracker.update(video, now, input, hint) : { faces: [], inferenceMs: 0 };
-    if (track.inferenceMs !== lastInferMs) {
+    if (track.observedAtMs !== undefined && track.observedAtMs !== lastInferMs) {
       inferFrames++;
-      lastInferMs = track.inferenceMs;
+      lastInferMs = track.observedAtMs;
     }
     sig = sim ? sim.update(dt) : signals.update(track, now, cameraInput!.canvas.width / cameraInput!.canvas.height, hint);
     snap = fsm.update(sig, now, hint!==null || body!==null);

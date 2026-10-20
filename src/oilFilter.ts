@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OilStroke, fitSize } from "./vendor/oil-stroke.js";
+import { PaintCadence } from "./paintCadence";
 
 /**
  * 유화 획 필터 (세부 보존) — 제작자가 준 단독 모듈 `vendor/oil-stroke.js`(재료 필터 갤러리와 픽셀 단위로 같음)를 씀.
@@ -75,6 +76,7 @@ export class OilStrokeFilter {
   private line = document.createElement("div");
   private fx: OilStroke;
   private applied = "";
+  private cadence = new PaintCadence();
 
   constructor(
     private renderer: THREE.WebGLRenderer,
@@ -119,6 +121,8 @@ export class OilStrokeFilter {
 
   /** 유화가 꺼지면 결과 캔버스를 숨김 */
   hide(): void {
+    this.cadence.reset();
+    this.applied = "";
     this.out.style.display = "none";
     this.line.style.display = "none";
   }
@@ -126,6 +130,12 @@ export class OilStrokeFilter {
   render(): void {
     const r = this.renderer, gl = this.gl;
     const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+    const now = performance.now() / 1000;
+    const c = this.cfg;
+    const short = Math.min(Math.round(c.shortSide * (c.res || 1)), Math.min(cw, ch));
+    const { w, h } = fitSize(cw, ch, short);
+    const key = `${w}x${h}|${c.strength}|${c.size}|${c.boil}|${c.fps}|${c.grade}`;
+    if (!this.cadence.take(now, c.fps, `${cw}x${ch}|${key}|${c.split}`, c.split)) return;
     // 1) 장면 → HalfFloat
     if (this.rt.width !== cw || this.rt.height !== ch) this.rt.setSize(cw, ch);
     r.setRenderTarget(this.rt);
@@ -171,10 +181,6 @@ export class OilStrokeFilter {
     gl.bindVertexArray(null);
     r.resetState();
     // 3) 모듈: 결과 크기(처리 해상도) · 값 · 비교 위치
-    const c = this.cfg;
-    const short = Math.min(Math.round(c.shortSide * (c.res || 1)), Math.min(cw, ch));
-    const { w, h } = fitSize(cw, ch, short);
-    const key = `${w}x${h}|${c.strength}|${c.size}|${c.boil}|${c.fps}|${c.grade}`;
     if (key !== this.applied) {
       if (this.out.width !== w || this.out.height !== h) {
         this.out.width = w;
@@ -189,7 +195,7 @@ export class OilStrokeFilter {
     this.line.style.display = sp > 0 && sp < 1 ? "block" : "none";
     this.line.style.left = `${sp * 100}%`;
     // 같은 틀 안에서 바로 (브라우저가 화면에 내보낸 WebGL 캔버스는 비워짐 — 가이드 2번)
-    this.fx.frame(r.domElement, performance.now() / 1000);
+    this.fx.frame(r.domElement, now);
   }
 
   /** 마지막 그림 CPU 시간 (ms) */

@@ -44,6 +44,8 @@ export class FaceRecovery {
       this.lastTimestamp = Math.max(now, this.lastTimestamp + 0.1);
       return detect(image, this.lastTimestamp);
     };
+    let scannedHint: Crop | null = null;
+    let hintFaces: RawFace[] = [];
     if (hint && [hint.cx,hint.cy,hint.size].every(Number.isFinite) && hint.size>0) {
       const size=Math.min(width,height,hint.size*height);
       let crop={x:Math.max(0,Math.min(width-size,hint.cx*width-size/2)),
@@ -54,7 +56,9 @@ export class FaceRecovery {
         crop=previous;
       // Follow the selected person's head. Unrelated full-frame faces must not
       // prevent an enlarged pass for this person, or steal its expression.
-      const faces=this.scan(input,crop,infer).filter(f=>faceMatchesHint(f,hint,width/height));
+      scannedHint = crop;
+      hintFaces = this.scan(input,crop,infer);
+      const faces=hintFaces.filter(f=>faceMatchesHint(f,hint,width/height));
       if (faces.length) {
         this.crop=crop;this.lastCropSeen=now;this.mode="person";
         return faces;
@@ -72,7 +76,10 @@ export class FaceRecovery {
       }
     }
     if (this.crop) {
-      const faces = this.scan(input, this.crop, infer);
+      // An unsuccessful person pass may already have scanned this exact crop.
+      // Reuse that observation; never rerun the same model on identical pixels.
+      const faces = scannedHint && scannedHint.x === this.crop.x && scannedHint.y === this.crop.y && scannedHint.size === this.crop.size
+        ? hintFaces : this.scan(input, this.crop, infer);
       if (faces.length) {
         this.lastCropSeen = now;
         // Keep the proven inference framing. A single successful full-frame
