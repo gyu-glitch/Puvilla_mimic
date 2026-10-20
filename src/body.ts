@@ -39,6 +39,7 @@ export class BodyProcessor {
     R: { active: false, since: -Infinity, samples: 0 },
   };
   private lastArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
+  private confidentArmVectors: {L: V3[] | null; R: V3[] | null} = {L:null,R:null};
   private weakSince = {L: -Infinity, R: -Infinity};
 
   constructor(private cfg: Config) {
@@ -72,6 +73,7 @@ export class BodyProcessor {
     const state = this.armState[s];
     state.active = false; state.since = -Infinity; state.samples = 0;
     this.lastArmVectors[s]=null;
+    this.confidentArmVectors[s]=null;
     this.weakSince[s]=-Infinity;
     for (const joint of ["elbow", "wrist", "handAcross", "handDirection"]) this.bank.resetPrefix(`${joint}${s}`);
   }
@@ -123,9 +125,12 @@ export class BodyProcessor {
       const state = this.armState[s], ids = side[s].slice(0, 3);
       const vectors=ids.slice(1).map(i=>usable(i)&&usable(ids[0])
         ? [w[i].x-w[ids[0]].x,w[i].y-w[ids[0]].y,w[i].z-w[ids[0]].z] as V3 : [0,0,0] as V3);
-      const previous=this.lastArmVectors[s];
-      const continuous=state.active && previous && vectors.every((v,i)=>
-        Math.hypot(...v.map((x,k)=>x-previous[i][k]))<=.06);
+      const previous=this.lastArmVectors[s],anchor=this.confidentArmVectors[s];
+      const near=(reference:V3[]|null)=>reference!==null&&vectors.every((v,i)=>
+        Math.hypot(...v.map((x,k)=>x-reference[i][k]))<=.06);
+      // Weak tracking may maintain a confirmed gesture, but must not gradually
+      // walk away from it by accepting an unlimited series of small steps.
+      const continuous=state.active && near(previous) && near(anchor);
       // A steady raised arm should not drop merely because visibility drifts
       // below the acquisition threshold. Uncertain jumps still release it.
       const threshold = Math.max(this.cfg.body.minVisibility, continuous ? .5 : .65);
@@ -158,7 +163,10 @@ export class BodyProcessor {
         state.active = nowMs - state.since >= 180 && state.samples >= 3;
       }else this.weakSince[s]=-Infinity;
       if (!state.active) armConfidence[s] = 0;
-      else if(!held[s]) this.lastArmVectors[s]=vectors;
+      else if(!held[s]) {
+        this.lastArmVectors[s]=vectors;
+        if(armConfidence[s]>=Math.max(this.cfg.body.minVisibility,.65))this.confidentArmVectors[s]=vectors;
+      }
     }
     const t = nowMs / 1000;
 

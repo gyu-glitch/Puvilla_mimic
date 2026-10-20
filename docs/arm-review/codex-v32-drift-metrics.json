@@ -1,0 +1,98 @@
+[
+  {
+    "fps": 15,
+    "mirror": false,
+    "side": "L",
+    "oldBad": 75,
+    "newBad": 0,
+    "held": 42
+  },
+  {
+    "fps": 15,
+    "mirror": false,
+    "side": "R",
+    "oldBad": 75,
+    "newBad": 0,
+    "held": 42
+  },
+  {
+    "fps": 15,
+    "mirror": true,
+    "side": "L",
+    "oldBad": 75,
+    "newBad": 0,
+    "held": 42
+  },
+  {
+    "fps": 15,
+    "mirror": true,
+    "side": "R",
+    "oldBad": 75,
+    "newBad": 0,
+    "held": 42
+  },
+  {
+    "fps": 30,
+    "mirror": false,
+    "side": "L",
+    "oldBad": 150,
+    "newBad": 0,
+    "held": 84
+  },
+  {
+    "fps": 30,
+    "mirror": false,
+    "side": "R",
+    "oldBad": 150,
+    "newBad": 0,
+    "held": 84
+  },
+  {
+    "fps": 30,
+    "mirror": true,
+    "side": "L",
+    "oldBad": 150,
+    "newBad": 0,
+    "held": 84
+  },
+  {
+    "fps": 30,
+    "mirror": true,
+    "side": "R",
+    "oldBad": 150,
+    "newBad": 0,
+    "held": 84
+  },
+  {
+    "fps": 60,
+    "mirror": false,
+    "side": "L",
+    "oldBad": 300,
+    "newBad": 0,
+    "held": 168
+  },
+  {
+    "fps": 60,
+    "mirror": false,
+    "side": "R",
+    "oldBad": 300,
+    "newBad": 0,
+    "held": 168
+  },
+  {
+    "fps": 60,
+    "mirror": true,
+    "side": "L",
+    "oldBad": 300,
+    "newBad": 0,
+    "held": 168
+  },
+  {
+    "fps": 60,
+    "mirror": true,
+    "side": "R",
+    "oldBad": 300,
+    "newBad": 0,
+    "held": 168
+  }
+]
