@@ -179,7 +179,8 @@
     "armHeadClearance": true,
     "armPawHold": true,
     "armContinuousAzimuth": true,
-    "armTorsoClearance": true
+    "armTorsoClearance": true,
+    "armPawContact": true
   },
   "scene": {
     "bgTop": "#F76A4B",

@@ -17,6 +17,7 @@ import { socketNormalProbes } from "./standingSocketNormals";
 import { standingWaveMotion } from "../standingWave";
 import { standingUpperDirection } from "./standingArmPose";
 import { StandingTorsoContact } from "./standingTorsoClearance";
+import {separateStandingPaws} from './standingPawContact';
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -1077,8 +1078,17 @@ export class PuuvillaCharacter implements CharacterRig {
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         clearStandingForearm(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,head.quaternion);
       }
-      arm.qUpper.slerp(tu, k);
-      arm.qFore.slerp(tf, k);
+    }
+    if(this.connectedArms && this.cfg.body.armPawContact){
+      separateStandingPaws(this.arms.map(arm=>{
+        const j=this.armJoints.find(j=>j.side===arm.side)!;
+        return {shoulder:j.s,length:j.h.distanceTo(j.s),rest:arm.restFore,upper:arm.tUpper,fore:arm.tFore};
+      }),chest.quaternion,head.quaternion);
+    }
+    for(const arm of this.arms){
+      const conf=pose?(arm.side>0?pose.armL:pose.armR):0;
+      arm.qUpper.slerp(arm.tUpper, k);
+      arm.qFore.slerp(arm.tFore, k);
       if(this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         resolveStandingHeadContact(j.s,j.h.distanceTo(j.s),arm.restFore,arm.qUpper,arm.qFore,head.quaternion,dtSec);
