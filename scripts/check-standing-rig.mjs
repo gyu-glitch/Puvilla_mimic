@@ -38,6 +38,31 @@ for(const i of rig.torsoAnchors){
  assert.deepEqual(rig.corrective[i],[0,0,0],'shoulder fairing must not reshape the torso');
 }
 const {Vector3}=await import('three');
+const {PlaneGeometry,Float32BufferAttribute,Uint16BufferAttribute}=await import('three');
+const {socketNormalProbes}=await import('../src/character/standingSocketNormals.ts');
+// On a planar linear field the least-squares probes must reproduce both the
+// field gradients and the unchanged source surface exactly.
+{
+ const g=new PlaneGeometry(2,2,2,2),p=g.getAttribute('position'),before=Array.from(p.array);
+ const aw=[],cor=[],weights=[],indices=[];
+ for(let i=0;i<p.count;i++){
+  const w=.5+.1*p.getX(i);aw.push(w,0,0);cor.push(0,0,.2*p.getY(i));
+  weights.push(1-w,w,0,0);indices.push(2,4,5,3);
+ }
+ g.setAttribute('connectedArmWeights',new Float32BufferAttribute(aw,3));
+ g.setAttribute('connectedArmCorrective',new Float32BufferAttribute(cor,3));
+ g.setAttribute('skinWeight',new Float32BufferAttribute(weights,4));
+ g.setAttribute('skinIndex',new Uint16BufferAttribute(indices,4));
+ const texture=socketNormalProbes(g),data=texture.image.data;
+ for(let i=0;i<p.count;i++)for(let axis=0;axis<2;axis++){
+  const k=(i*8+axis*4)*4,x=data[k],y=data[k+1];
+  assert.ok(Math.abs(data[k+8]-(.5+.1*x))<1e-6,'probe lost arm-weight gradient');
+  assert.ok(Math.abs(data[k+14]-.2*y)<1e-6,'probe lost corrective gradient');
+  assert.ok(Math.abs(data[k+5]-(.5+.1*x))<1e-6,'probe lost bone-weight gradient');
+ }
+ assert.deepEqual(Array.from(p.array),before,'normal probes modified source positions');
+ texture.dispose();g.dispose();
+}
 const {roundedElbowCenter}=await import('../src/character/standingBend.ts');
 // Geometric invariants of the rounded elbow: arc length, continuous tangent,
 // exact straight rest, and a rigid distal segment. These detect shortening and

@@ -10,6 +10,7 @@ import { fillMouthGroove, smoothDepth } from "./mouthRig";
 import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, makeKnitMaterial, pca, type MufflerSrc } from "./outfit";
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
 import { StandingArmSurface } from "./standingArmSurface";
+import { socketNormalProbes } from "./standingSocketNormals";
 import { standingWaveMotion } from "../standingWave";
 import { standingUpperDirection } from "./standingArmPose";
 
@@ -557,6 +558,8 @@ export class PuuvillaCharacter implements CharacterRig {
         geo.setAttribute("aMouthIn", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
       }
 
+      if(geo.getAttribute('connectedArmWeights') && this.armSurface)
+        this.armSurface.normalProbes.value=socketNormalProbes(geo);
       const add = (mat: THREE.Material, order: number) => {
         if (geo.getAttribute("connectedArmWeights")) this.armSurface?.attach(mat);
         const m = new THREE.SkinnedMesh(geo, mat);

@@ -21,6 +21,8 @@ const cfg=JSON.parse(JSON.stringify(await loadConfig('/config.json')).replaceAll
 cfg.body.armRig=new URLSearchParams(location.search).get('rig')==='legacy'?'legacy':'connected';
 if(new URLSearchParams(location.search).get('weights')==='sections')cfg.body.armRigPath='/models/stand_connected_rig_sections.json';
 if(new URLSearchParams(location.search).get('weights')==='portrait')cfg.body.armRigPath='/models/stand_connected_rig_portrait.json';
+const socketTest=new URLSearchParams(location.search).get('socket');
+if(['12','zero','pivot','fair'].includes(socketTest))cfg.body.armRigPath=`/dev/stand_socket_${socketTest}.json`;
 cfg.character.modelPath='/models/pu_stand.obj'; cfg.outfit.seatBody=false; cfg.outfit.sitBody=false;cfg.outfit.style='christmas';
 if(new URLSearchParams(location.search).get('candidate')==='posefirst'){cfg.character.modelPath='/dev/stand_pose_first_preview.obj';cfg.body.armRig='legacy';}
 cfg.body.enabled=true;cfg.body.armRaiseMaxRad=3;cfg.character.idleBreathAmp=0;
@@ -41,7 +43,7 @@ if(new URLSearchParams(location.search).has('turn'))character.debugPawTurn=Numbe
 scene.scene.add(character.root);character.setShellCount(0);scene.ready=true;
 const controls={pose:document.querySelector('#pose'),view:document.querySelector('#view'),look:document.querySelector('#look'),range:document.querySelector('#range')};
 const qp=new URLSearchParams(location.search);
-const reviewTag=qp.get('candidate')==='posefirst'?'codex-v6-posefirst':'codex-v6';
+const reviewTag=qp.get('candidate')==='posefirst'?'codex-v6-posefirst':socketTest?`codex-v7-socket-${socketTest}`:'codex-v7';
 if(qp.get('source')==='1')document.querySelector('#record').disabled=true;
 let recordEpoch=null;
 document.querySelector('#hold').checked=qp.get('hold')==='1';

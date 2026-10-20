@@ -2,7 +2,7 @@ import * as T from 'three';
 
 // Pose-space fairing of the connected shoulder cage. The source mesh and all
 // topology stay untouched; only a zero-at-rest corrective attribute is baked.
-export function socketCorrective(P, neighbors, weights, joints, preview = false) {
+export function socketCorrective(P, neighbors, weights, joints, preview = false, finishPasses = 8) {
  const v=a=>new T.Vector3(...a), smooth=(a,b,x)=>{const t=T.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
  const sides=[1,-1].map(side=>{
   const j=joints[side>0?'L':'R'],s=v(j.shoulder),e=v(j.elbow),axis=v(j.hand).sub(s),length=axis.length();axis.normalize();
@@ -36,7 +36,7 @@ export function socketCorrective(P, neighbors, weights, joints, preview = false)
  // Alternating fairing passes avoid the systematic shrinkage of repeatedly
  // averaging the joint. Eight short finishing passes soften the residual fold
  // at the socket only. All hand and central torso vertices remain anchored.
- for(let pass=0;pass<48;pass++){
+ for(let pass=0;pass<40+finishPasses;pass++){
   fair=fair.map((p,i)=>{
    if(region[i]===0)return p;
    const average=new T.Vector3();let sum=0;

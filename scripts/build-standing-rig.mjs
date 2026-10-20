@@ -5,6 +5,10 @@ import { parseObj } from '../src/character/subdivide.ts';
 import { socketCorrective } from './standing-socket-corrective.mjs';
 
 const source = readFileSync('public/models/pu_stand.obj', 'utf8');
+const socketWidth=Number(process.argv.find(a=>a.startsWith('--socket-width='))?.split('=')[1]??18);
+const socketRise=Number(process.argv.find(a=>a.startsWith('--socket-rise='))?.split('=')[1]??1);
+if(!Number.isFinite(socketRise)||socketRise<0||socketRise>15)throw new Error('Socket rise must be 0..15 cm');
+if(!Number.isFinite(socketWidth)||socketWidth<6||socketWidth>30)throw new Error('Socket width must be 6..30 cm');
 const mesh = parseObj(source).find(m => m.name === 'pu_body');
 if (!mesh || mesh.faces.some(f => f.length !== 4)) throw new Error('Expected original quad body');
 const P=mesh.positions,Q=mesh.faces;
@@ -64,7 +68,7 @@ for(const side of [-1,1]){
  for(let i=0;i<P.length;i++){
   // Torso vertices are anchors. Blend on the arm side of the socket only;
   // raising a hand must not pull the belly or flank into the shoulder.
-  let w=arm.has(i)? smooth(0,18,da[i]) : 0;
+  let w=arm.has(i)? smooth(0,socketWidth,da[i]) : 0;
   if(!Number.isFinite(w))w=0;
   w*=smooth(15,22,Math.abs(P[i][0]))*(1-smooth(110,119,P[i][1]));
   weights[i][side>0?0:1]=w;
@@ -81,7 +85,7 @@ for(const key of ['shoulder','hand']){
 for(const side of ['L','R'])joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
 const portrait=!process.argv.includes('--legacy')&&!process.argv.includes('--sections');
 if(portrait)for(const side of ['L','R']){
- joints[side].shoulder[1]+=1;
+ joints[side].shoulder[1]+=socketRise;
  joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
 }
 // Experimental cross-section weights: every point on a plane normal to the
@@ -95,9 +99,12 @@ if(sections){
   weights[i][2]=(weights[i][0]+weights[i][1])*smooth(-6,6,along);
  }
 }
-const corrective=socketCorrective(P,neighbors,weights,joints);
+const finishPasses=Number(process.argv.find(a=>a.startsWith('--fair-finish='))?.split('=')[1]??8);
+if(!Number.isInteger(finishPasses)||finishPasses<0||finishPasses>40)throw new Error('Fair finish must be 0..40');
+const corrective=socketCorrective(P,neighbors,weights,joints,false,finishPasses);
 const torsoAnchors=P.map((_,i)=>i).filter(i=>!armInterior.has(i));
 const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints,corrective,torsoAnchors};
 const suffix=process.argv.includes('--portrait')?'_portrait':process.argv.includes('--sections')?'_sections':process.argv.includes('--legacy')?'_legacy':'';
-writeFileSync(`public/models/stand_connected_rig${suffix}.json`,JSON.stringify(data));
+const output=process.argv.find(a=>a.startsWith('--output='))?.slice(9)??`public/models/stand_connected_rig${suffix}.json`;
+writeFileSync(output,JSON.stringify(data));
 console.log(`Saved connected rig: ${P.length} cage vertices, original topology unchanged.`);
