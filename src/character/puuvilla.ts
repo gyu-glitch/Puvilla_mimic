@@ -16,6 +16,7 @@ import { StandingArmSurface } from "./standingArmSurface";
 import { socketNormalProbes } from "./standingSocketNormals";
 import { standingWaveMotion } from "../standingWave";
 import { standingUpperDirection } from "./standingArmPose";
+import { StandingTorsoContact } from "./standingTorsoClearance";
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -282,6 +283,7 @@ export class PuuvillaCharacter implements CharacterRig {
   private armSurface: StandingArmSurface | null = null;
   private cageSurface: StandingCageSurface | null = null;
   private pawTracking=[new StandingPawTracking(),new StandingPawTracking()];
+  private torsoContact=[new StandingTorsoContact(),new StandingTorsoContact()];
 
   private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null, standingRig: StandingRig | null = null) {
     this.connectedArms = standingRig !== null;
@@ -899,6 +901,11 @@ export class PuuvillaCharacter implements CharacterRig {
     this.fur.uOldScarf.value = xmas || this.sit ? 0 : 1;
   }
 
+  /** Reset contact history before replaying a deterministic review sequence. */
+  resetArmContact(): void {
+    this.torsoContact.forEach(contact=>contact.reset());
+  }
+
   /** 성능 조절: 털 셸을 n 장만 그림 (뿌리~끝에 고르게 남김). 털 길이는 그대로, 층 간격만 넓어짐 */
   setShellCount(n: number): void {
     const N = this.shellMeshes.length;
@@ -1061,6 +1068,10 @@ export class PuuvillaCharacter implements CharacterRig {
           tu.premultiply(_qIdle);
           tf.copy(_qIdleF);
         }
+      }
+      if(this.connectedArms && this.cfg.body.armTorsoClearance){
+        const j=this.armJoints.find(j=>j.side===arm.side)!;
+        this.torsoContact[arm.side>0?0:1].solve(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,dtSec,chest.quaternion);
       }
       if(this.connectedArms && this.cfg.body.armHeadClearance){
         const j=this.armJoints.find(j=>j.side===arm.side)!;

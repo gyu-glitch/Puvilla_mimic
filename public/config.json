@@ -178,7 +178,8 @@
     "armDeform": "cage",
     "armHeadClearance": true,
     "armPawHold": true,
-    "armContinuousAzimuth": true
+    "armContinuousAzimuth": true,
+    "armTorsoClearance": true
   },
   "scene": {
     "bgTop": "#F76A4B",
