@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>메쉬 확인</title>
+<style>html,body{margin:0;background:#222;color:#fff;font:12px monospace}#i{white-space:pre;padding:6px}</style></head>
+<body><div id="i">loading…</div>
+<script type="module">
+// 개발 전용: ?f=/dev/tmp/x.glb (또는 .obj) → 정면·3/4·옆·뒤 한 장
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+const qs = new URLSearchParams(location.search);
+const files = (qs.get("f") || "/dev/tmp/tpose.glb").split(",");
+const CW = 420, CH = 460;
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+R.setSize(CW, CH); R.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe8573a);
+scene.environment = new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 1.3));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(2, 3, 4); scene.add(key);
+const cam = new THREE.PerspectiveCamera(26, CW / CH, 0.01, 10000);
+const mat = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.75, flatShading: qs.has("flat") });
+const info = [];
+const sheet = document.createElement("canvas"); sheet.width = CW * 4; sheet.height = (CH + 24) * files.length;
+const g2 = sheet.getContext("2d"); g2.fillStyle = "#222"; g2.fillRect(0, 0, sheet.width, sheet.height);
+for (let fi = 0; fi < files.length; fi++) {
+  const f = files[fi];
+  const obj = f.endsWith(".obj") ? await new OBJLoader().loadAsync(f) : (await new GLTFLoader().loadAsync(f)).scene;
+  let tris = 0;
+  // ?only=armR,torso → 그 이름의 메쉬만 (glb 안의 여러 메쉬 중 골라 보기) · ?double=1 → 양면 (열린 껍질 안쪽도)
+  const only = qs.get("only")?.split(",");
+  if (qs.has("double")) mat.side = THREE.DoubleSide;
+  obj.traverse((m) => { if (m.isMesh) { if (only && !only.includes(m.name)) { m.visible = false; return; } m.material = mat; m.geometry.computeVertexNormals(); tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; } });
+  scene.add(obj);
+  const b = new THREE.Box3().setFromObject(obj), ctr = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  info.push(`${f}: tris ${tris} · size ${sz.toArray().map((v) => v.toFixed(2)).join("×")} · min ${b.min.toArray().map((v) => v.toFixed(2))} max ${b.max.toArray().map((v) => v.toFixed(2))}`);
+  const r = Math.max(sz.x, sz.y, sz.z) * 0.6, dist = r / Math.sin((cam.fov * Math.PI) / 360);
+  [["정면", 0], ["3/4", 0.75], ["옆", Math.PI / 2], ["뒤", Math.PI]].forEach(([vn, az], vi) => {
+    cam.position.set(ctr.x + dist * Math.sin(az), ctr.y + dist * 0.08, ctr.z + dist * Math.cos(az)); cam.lookAt(ctr); R.render(scene, cam);
+    g2.drawImage(R.domElement, vi * CW, fi * (CH + 24) + 24); g2.fillStyle = "#fff"; g2.font = "14px sans-serif"; g2.fillText(vi === 0 ? `${f} · ${vn}` : vn, vi * CW + 8, fi * (CH + 24) + 18);
+  });
+  scene.remove(obj);
+}
+document.body.appendChild(sheet); sheet.style.width = "100%";
+document.getElementById("i").textContent = info.join("\n");
+window.__sheet = sheet.toDataURL("image/png"); window.__info = info; window.__ready = true;
+</script></body></html>

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/models/*.task
+public/mediapipe/wasm/
+.DS_Store
+*.log
+.trace/
+release/
+dist-next/
+dist-old/

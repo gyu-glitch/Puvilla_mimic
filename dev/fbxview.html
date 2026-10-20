@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>FBX 확인</title>
+<style>html,body{margin:0;height:100%;background:#e8573a}canvas{display:block;width:100%;height:100%}#i{position:fixed;left:8px;top:8px;color:#fff;font:12px monospace;white-space:pre}</style></head>
+<body><div id="i">loading…</div>
+<script type="module">
+import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); document.body.appendChild(R.domElement);
+R.setSize(innerWidth, innerHeight); R.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe8573a);
+scene.environment = new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.2)); const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(2, 3, 4); scene.add(d);
+const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.01, 100);
+const qs = new URLSearchParams(location.search);
+const names = (qs.get("f") || "A,B,C").split(",");
+const dir = qs.get("d") || "Puuvilla_V02";
+const loader = new FBXLoader(); const info = []; const objs = [];
+for (let i = 0; i < names.length; i++) {
+  const o = await loader.loadAsync(`/__asset/${dir}/${names[i]}.fbx`);
+  { const b = new THREE.Box3().setFromObject(o); const sz = b.getSize(new THREE.Vector3()); const k = 3 / Math.max(sz.x, sz.y, sz.z); o.scale.setScalar(k); o.position.set((i - (names.length - 1) / 2) * 3.4 - (b.min.x + b.max.x) / 2 * k, -b.min.y * k, -(b.min.z + b.max.z) / 2 * k); } scene.add(o); objs.push(o);
+  o.traverse((m) => { if (m.isMesh) { const ms = Array.isArray(m.material) ? m.material : [m.material]; info.push(`${names[i]} ${m.name} mats: ${ms.map((x) => `${x.type}:${x.name} map=${x.map ? (x.map.image ? x.map.image.width + 'x' + x.map.image.height : 'noimg') : '-'}`).join(' | ')} groups=${m.geometry.groups.length}`); } });
+}
+document.getElementById("i").textContent = info.join("\n");
+window.__view = (az = 0, el = 0, target = [0, 1.5, 0], dist = 10, fov = 30) => {
+  cam.fov = fov; cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
+  const t = new THREE.Vector3(...target);
+  cam.position.set(t.x + dist * Math.sin(az) * Math.cos(el), t.y + dist * Math.sin(el), t.z + dist * Math.cos(az) * Math.cos(el));
+  cam.lookAt(t); R.render(scene, cam); return R.domElement.toDataURL('image/png');
+};
+window.__objs = objs; window.__three = THREE; window.__ready = true;
+__view();
+</script></body></html>

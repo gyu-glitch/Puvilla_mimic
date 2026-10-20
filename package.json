@@ -1,0 +1,32 @@
+{
+  "name": "pubilla-mimic-codex",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "푸빌라 미믹 — 웹캠 + MediaPipe Face Landmarker + Three.js(WebGL) 표정/고개 미러링 인터랙션",
+  "scripts": {
+    "postinstall": "node scripts/copy-wasm.mjs",
+    "fetch-models": "node scripts/fetch-models.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "kiosk:win": "scripts\\kiosk.cmd",
+    "kiosk:mac": "sh scripts/kiosk.sh",
+    "build:single": "npm run build && node scripts/build-single.mjs",
+    "serve": "node scripts/serve.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:preview": "node scripts/deploy.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.0",
+    "lil-gui": "0.21.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "meshoptimizer": "^0.22.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

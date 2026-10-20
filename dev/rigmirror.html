@@ -1,0 +1,396 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Seat_A 왼팔 미러 리깅</title>
+<style>html,body{margin:0;background:#222;color:#fff;font:12px monospace}#i{white-space:pre;padding:6px}</style></head>
+<body><div id="i">loading…</div>
+<script type="module">
+/**
+ * 개발 전용: asset/Puuvilla_V03/Puuvilla_Seat_A.fbx (고개·오른팔 리깅) → 왼팔을 오른팔 미러로 리깅·가중치 → public/models/seat_a.glb
+ * - FBX 관절이 하나 걸러 0.01 배율이라 three FBXLoader 의 뼈대 자세가 뭉침 → 뼈대를 새로 만듦:
+ *   관절 위치 = boneInverse 의 역(×100 → cm, 지오메트리와 같은 단위), 회전 없음, 부모 관계는 원본 그대로
+ * - 왼팔 본 = 오른팔 본 위치의 x 반전 (부모도 같은 짝)
+ * - 왼쪽(x > 0) 정점: 거울 위치(−x, y, z)의 가장 가까운 정점 가중치를 가져와 R_* → L_* 로 바꿈.
+ *   단, 거울 정점에 오른팔 가중치가 없으면(몸통·머리) 원래 가중치 그대로
+ * - 결과는 three GLTFExporter 로 glb (Blender·Maya 에서도 열림)
+ */
+import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+const log = [];
+const fbx = await new FBXLoader().loadAsync("/__asset/Puuvilla_V03/Puuvilla_Seat_A.fbx");
+let sk;
+fbx.traverse((m) => { if (m.isSkinnedMesh) sk = m; });
+const src = sk.geometry;
+const oldBones = sk.skeleton.bones;
+const name = (b) => b.name.replace("F04_", "").replace("_JNT", "");
+const names = oldBones.map(name);
+const joint = sk.skeleton.boneInverses.map((m) => new THREE.Vector3().setFromMatrixPosition(m.clone().invert()).multiplyScalar(100));
+const parent = oldBones.map((b) => oldBones.indexOf(b.parent));
+// 어깨 회전 중심: 원본(-58,182,-4)은 목 옆이라 팔을 들면 어깨 위·옆구리가 통째로 끌려감 → 팔이 몸에 붙는 자리로 (?sh= 로 바꿔 볼 수 있음)
+{ const q = new URLSearchParams(location.search).get("sh") || "-75,165,-4"; const [x, y, z] = q.split(",").map(Number); joint[names.indexOf("R_Shoulder")].set(x, y, z); }
+log.push("bones: " + names.map((n, i) => `${n}<${parent[i] >= 0 ? names[parent[i]] : "-"}`).join(" "));
+
+// ── 새 뼈대 (오른팔 짝을 왼팔로 추가) ──
+const allNames = [...names];
+const allJoint = joint.map((v) => v.clone());
+const allParent = [...parent];
+const rIdx = names.map((n, i) => (n.startsWith("R_") ? i : -1)).filter((i) => i >= 0);
+const lOf = new Map(); // 오른팔 본 → 왼팔 본 인덱스
+for (const i of rIdx) {
+  lOf.set(i, allNames.length);
+  allNames.push("L_" + names[i].slice(2));
+  allJoint.push(new THREE.Vector3(-joint[i].x, joint[i].y, joint[i].z));
+  allParent.push(-2); // 아래에서
+}
+for (const i of rIdx) {
+  const p = parent[i];
+  allParent[lOf.get(i)] = lOf.has(p) ? lOf.get(p) : p;
+}
+const bones = allNames.map((n) => { const b = new THREE.Bone(); b.name = n; return b; });
+allNames.forEach((_, i) => {
+  const p = allParent[i];
+  if (p >= 0) { bones[p].add(bones[i]); bones[i].position.copy(allJoint[i]).sub(allJoint[p]); }
+  else bones[i].position.copy(allJoint[i]);
+});
+
+// ── 가중치: 원본 + 왼쪽 미러 ──
+const pos = src.getAttribute("position"), si = src.getAttribute("skinIndex"), sw = src.getAttribute("skinWeight");
+const n = pos.count;
+const CELL = 2;
+const grid = new Map();
+const key = (x, y, z) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)},${Math.floor(z / CELL)}`;
+for (let i = 0; i < n; i++) {
+  const k = key(pos.getX(i), pos.getY(i), pos.getZ(i));
+  (grid.get(k) ?? grid.set(k, []).get(k)).push(i);
+}
+const nearest = (x, y, z) => {
+  let best = -1, bd = Infinity;
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), cz = Math.floor(z / CELL);
+  for (let r = 1; r <= 4 && best < 0; r++)
+    for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) for (let c = -r; c <= r; c++) {
+      const l = grid.get(`${cx + a},${cy + b},${cz + c}`);
+      if (l) for (const j of l) { const d = (pos.getX(j) - x) ** 2 + (pos.getY(j) - y) ** 2 + (pos.getZ(j) - z) ** 2; if (d < bd) { bd = d; best = j; } }
+    }
+  return [best, Math.sqrt(bd)];
+};
+const SI = new Uint16Array(n * 4), SW = new Float32Array(n * 4);
+let mirrored = 0, maxD = 0, sumD = 0;
+for (let i = 0; i < n; i++) for (let k = 0; k < 4; k++) { SI[i * 4 + k] = si.getComponent(i, k); SW[i * 4 + k] = sw.getComponent(i, k); }
+const QS = new URLSearchParams(location.search);
+if (QS.get("w") !== "orig") reweightRightArm();
+// ── 오른팔 가중치 다시 잡기 ──
+// 원본은 팔 가중치가 몸통 옆으로 고르지 않게 번져 있어 팔을 들면 옆구리가 날개처럼 찢어짐.
+// 몸에서 떨어진 팔(팔꿈치 아래) = 팔 1, 몸통 가운데·바닥·머리·멀리 = 0 으로 고정하고
+// 그 사이(몸에 붙은 위팔·어깨·옆구리)는 메쉬 표면을 따라 반복 평균(열 확산) → 넓고 부드러운 경사.
+// 팔 안에서는 사슬(어깨→팔꿈치→아래팔→손목→손) 위 위치로 본을 나눔 (관절마다 부드럽게)
+function reweightRightArm() {
+  const chain = ["R_Shoulder", "R_Elbow", "R_Forearm", "R_Wrist", "R_Hand"].map((nm) => names.indexOf(nm));
+  const thumb = names.indexOf("R_Thumb");
+  const J = chain.map((i) => joint[i]);
+  const handTip = J[4].clone().add(J[4].clone().sub(J[3]).multiplyScalar(0.8));
+  const pts = [...J, handTip];
+  const segInfo = (q) => {
+    let best = { d: Infinity, s: 0, t: 0 };
+    for (let k = 0; k < pts.length - 1; k++) {
+      const a = pts[k], b = pts[k + 1], ab = b.clone().sub(a);
+      const t = Math.min(1, Math.max(0, q.clone().sub(a).dot(ab) / ab.lengthSq()));
+      const d = a.clone().addScaledVector(ab, t).distanceTo(q);
+      if (d < best.d) best = { d, s: k, t };
+    }
+    return best;
+  };
+  // 위치로 용접한 이웃 (FBX 는 UV 이음매마다 정점이 갈라져 있음)
+  const wid = new Int32Array(n), wmap = new Map(), wpos = [];
+  for (let i = 0; i < n; i++) {
+    const k = `${Math.round(pos.getX(i) * 100)},${Math.round(pos.getY(i) * 100)},${Math.round(pos.getZ(i) * 100)}`;
+    let id = wmap.get(k);
+    if (id === undefined) { id = wpos.length; wmap.set(k, id); wpos.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i))); }
+    wid[i] = id;
+  }
+  const W = wpos.length, nb = Array.from({ length: W }, () => new Set());
+  const idx = src.index;
+  const tri = (k) => (idx ? idx.getX(k) : k);
+  const triCount = idx ? idx.count : n;
+  for (let t = 0; t < triCount; t += 3) {
+    const a = wid[tri(t)], b = wid[tri(t + 1)], c = wid[tri(t + 2)];
+    nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b);
+  }
+  const headW = new Float32Array(W), origArm = new Float32Array(W);
+  for (let i = 0; i < n; i++) {
+    let h = 0, a = 0;
+    for (let k = 0; k < 4; k++) {
+      const nm = names[si.getComponent(i, k)], ww = sw.getComponent(i, k);
+      if (nm === "Head" || nm === "Neck") h += ww;
+      if (nm.startsWith("R_")) a += ww;
+    }
+    headW[wid[i]] = Math.max(headW[wid[i]], h);
+    origArm[wid[i]] = Math.max(origArm[wid[i]], a);
+  }
+  const info = wpos.map((q) => segInfo(q));
+  const fixed = new Int8Array(W), w = new Float32Array(W);
+  const ARM_R = Number(QS.get("armR") || 26), ARM_FROM = Number(QS.get("armFrom") || 0.7), BODY_X = Number(QS.get("bodyX") || -50);
+  for (let v = 0; v < W; v++) {
+    const q = wpos[v], sI = info[v], along = sI.s + sI.t; // 0 = 어깨 … 5 = 손끝
+    if (along >= ARM_FROM && origArm[v] > 0.5) { fixed[v] = 1; w[v] = 1; }                       // 몸에서 떨어진 팔 (손 끝까지)
+    else if (q.x > BODY_X || q.y < 35 || headW[v] > 0.3 || (sI.d > ARM_R + 18 && origArm[v] < 0.05)) { fixed[v] = 1; w[v] = 0; }
+    else w[v] = origArm[v];
+  }
+  const iters = Number(QS.get("iters") || 160);
+  for (let it = 0; it < iters; it++) {
+    const nw = new Float32Array(W);
+    for (let v = 0; v < W; v++) {
+      if (fixed[v]) { nw[v] = w[v]; continue; }
+      let s2 = 0;
+      for (const u of nb[v]) s2 += w[u];
+      nw[v] = nb[v].size ? s2 / nb[v].size : w[v];
+    }
+    w.set(nw);
+  }
+  for (let i = 0; i < n; i++) {
+    const v = wid[i], a = Math.min(1, Math.max(0, w[v]));
+    const cand = new Map();
+    let rest = 0;
+    for (let k = 0; k < 4; k++) {
+      const b = si.getComponent(i, k), ww = sw.getComponent(i, k);
+      if (!names[b].startsWith("R_")) { cand.set(b, (cand.get(b) || 0) + ww); rest += ww; }
+    }
+    if (rest < 1e-6) { cand.clear(); cand.set(names.indexOf("BodyHold"), 1); rest = 1; }
+    for (const [b, ww] of cand) cand.set(b, (ww / rest) * (1 - a));
+    if (a > 0) {
+      const q = wpos[v], sI = info[v], along = sI.s + sI.t;
+      const k0 = Math.min(4, Math.floor(along)), f = along - Math.floor(along);
+      const blend = f < 0.25 && k0 > 0 ? 0.5 - f * 2 : f > 0.75 && k0 < 4 ? (f - 0.75) * 2 : 0;
+      const other = f < 0.5 ? k0 - 1 : k0 + 1;
+      const bMain = chain[k0], bOther = chain[Math.max(0, Math.min(4, other))];
+      const isThumb = thumb >= 0 && q.distanceTo(joint[thumb]) < 12 && along > 3.6;
+      if (isThumb) cand.set(thumb, (cand.get(thumb) || 0) + a);
+      else {
+        cand.set(bMain, (cand.get(bMain) || 0) + a * (1 - blend));
+        if (blend > 0) cand.set(bOther, (cand.get(bOther) || 0) + a * blend);
+      }
+    }
+    const top = [...cand].sort((x, y) => y[1] - x[1]).slice(0, 4), tot = top.reduce((s2, x) => s2 + x[1], 0);
+    for (let k = 0; k < 4; k++) { SI[i * 4 + k] = top[k]?.[0] ?? 0; SW[i * 4 + k] = top[k] ? top[k][1] / tot : 0; }
+  }
+  log.push(`오른팔 가중치 재계산: 용접 정점 ${W}, 팔 반경 ${ARM_R}cm, 팔 고정 시작 ${ARM_FROM}, 몸통 x ${BODY_X}`);
+}
+// 원본 왼쪽에 오른팔 가중치가 섞여 있으면 안 됨 — 확인용
+let leftHasR = 0;
+for (let i = 0; i < n; i++) if (pos.getX(i) > 1) for (let k = 0; k < 4; k++) if (SW[i * 4 + k] > 0.01 && rIdx.includes(SI[i * 4 + k])) { leftHasR++; break; }
+for (let i = 0; i < n; i++) {
+  const x = pos.getX(i);
+  if (x <= 0) continue;
+  const [j, d] = nearest(-x, pos.getY(i), pos.getZ(i));
+  if (j < 0) continue;
+  let arm = 0;
+  for (let k = 0; k < 4; k++) if (rIdx.includes(SI[j * 4 + k])) arm += SW[j * 4 + k];
+  if (arm < 1e-4) continue;
+  for (let k = 0; k < 4; k++) {
+    const b = SI[j * 4 + k];
+    SI[i * 4 + k] = lOf.has(b) ? lOf.get(b) : b;
+    SW[i * 4 + k] = SW[j * 4 + k];
+  }
+  mirrored++; maxD = Math.max(maxD, d); sumD += d;
+}
+log.push(`verts ${n} · 왼쪽 미러 ${mirrored} · 거울 정점 거리 평균 ${(sumD / Math.max(1, mirrored)).toFixed(3)}cm 최대 ${maxD.toFixed(3)}cm · 원본 왼쪽에 오른팔 가중치 ${leftHasR}`);
+
+// ── 어깨 보조 본 (회전 나눠 갖기) ──
+// 몸에 붙은 위팔·어깨 정점은 '몸 (1−w) + 어깨 w' 선형 혼합이라 팔을 크게 들면 두 위치의 중간(현)에 놓여 납작해짐.
+// → 어깨와 같은 자리에 어깨 회전의 k/K 만 따라가는 보조 본 K−1 개를 두고, 혼합 정점은 보조 본(분수 = w)에 붙임
+//    → 정점이 회전 각도의 w 만큼 '호'를 따라 돌아 부피가 유지됨. 앱에서 매 틀 보조 본 = slerp(없음, 어깨, k/K).
+const HK = Number(new URLSearchParams(location.search).get("helpers") ?? 8);
+const helperOf = { R: [], L: [] };
+if (HK > 1) {
+  const body = allNames.indexOf("BodyHold");
+  for (const side of ["R", "L"]) {
+    const sh = allNames.indexOf(side + "_Shoulder");
+    for (let k = 1; k < HK; k++) {
+      const b = new THREE.Bone(); b.name = `${side}_ShoulderPart${k}`;
+      b.position.copy(bones[sh].position); bones[allParent[sh]].add(b);
+      b.userData.follow = { bone: sh, frac: k / HK };
+      bones.push(b); allNames.push(b.name); allParent.push(allParent[sh]); allJoint.push(allJoint[sh].clone());
+      helperOf[side].push(allNames.length - 1);
+    }
+    let conv = 0;
+    for (let i = 0; i < n; i++) {
+      let ws = 0, wb = 0;
+      for (let k = 0; k < 4; k++) { if (SI[i * 4 + k] === sh) ws += SW[i * 4 + k]; if (SI[i * 4 + k] === body) wb += SW[i * 4 + k]; }
+      if (ws < 1e-4 || wb < 1e-4) continue;
+      const f = ws / (ws + wb), tot = ws + wb;
+      // 분수 f 를 보조 본 두 개 사이로 (0 = 몸, HK = 어깨)
+      const x = f * HK, k0 = Math.floor(x), t = x - k0;
+      const boneAt = (k) => (k <= 0 ? body : k >= HK ? sh : helperOf[side][k - 1]);
+      const cand = new Map();
+      for (let k = 0; k < 4; k++) { const b = SI[i * 4 + k]; if (b !== sh && b !== body && SW[i * 4 + k] > 0) cand.set(b, (cand.get(b) || 0) + SW[i * 4 + k]); }
+      cand.set(boneAt(k0), (cand.get(boneAt(k0)) || 0) + tot * (1 - t));
+      if (t > 1e-4) cand.set(boneAt(k0 + 1), (cand.get(boneAt(k0 + 1)) || 0) + tot * t);
+      const top = [...cand].sort((a, b) => b[1] - a[1]).slice(0, 4), sum = top.reduce((a, x2) => a + x2[1], 0);
+      for (let k = 0; k < 4; k++) { SI[i * 4 + k] = top[k]?.[0] ?? 0; SW[i * 4 + k] = top[k] ? top[k][1] / sum : 0; }
+      conv++;
+    }
+    log.push(`${side} 어깨 보조 본 ${HK - 1}개 · 혼합 정점 ${conv}`);
+  }
+}
+const syncHelpers = () => bones.forEach((b) => { const f = b.userData.follow; if (f) b.quaternion.identity().slerp(bones[f.bone].quaternion, f.frac); });
+// ── 새 메쉬 ──
+const geo = new THREE.BufferGeometry();
+for (const a of ["position", "normal", "uv"]) if (src.getAttribute(a)) geo.setAttribute(a, src.getAttribute(a).clone());
+geo.setIndex(src.index ? src.index.clone() : null);
+src.groups.forEach((g) => geo.addGroup(g.start, g.count, g.materialIndex));
+geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(SI, 4));
+geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(SW, 4));
+const mFace = new THREE.MeshStandardMaterial({ name: "face", color: 0x151515, roughness: 0.35 });
+const mBody = new THREE.MeshStandardMaterial({ name: "body", color: 0xf4f4f4, roughness: 0.75 });
+const mesh = new THREE.SkinnedMesh(geo, [mFace, mBody]);
+mesh.name = "Puuvilla_Seat_A";
+const root = new THREE.Group(); root.name = "Puuvilla_Seat_A_rig";
+const rootBones = bones.filter((b, i) => allParent[i] < 0);
+root.add(...rootBones, mesh);
+root.updateMatrixWorld(true);
+mesh.bind(new THREE.Skeleton(bones));
+
+// ── 확인 렌더: 기본 / 양팔 들기 / 고개 돌리기 + 가중치 색 ──
+const CW = 420, CH = 460;
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+R.setSize(CW, CH); R.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe8573a);
+scene.environment = new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 1.3));
+const key2 = new THREE.DirectionalLight(0xffffff, 1.6); key2.position.set(2, 3, 4); scene.add(key2);
+scene.add(root);
+const cam = new THREE.PerspectiveCamera(26, CW / CH, 1, 10000);
+const BONE_COL = { BodyHold: 0xf2f2f2, Neck: 0x26c6da, Head: 0x3f6fff, Shoulder: 0x1b5e20, Elbow: 0x2e7d32, Forearm: 0x43a047, Wrist: 0x7cb342, Hand: 0xc0ca33, Thumb: 0xfdd835 };
+const col = new Float32Array(n * 3), c = new THREE.Color();
+for (let i = 0; i < n; i++) {
+  let best = 0, bw = -1;
+  for (let k = 0; k < 4; k++) if (SW[i * 4 + k] > bw) { bw = SW[i * 4 + k]; best = SI[i * 4 + k]; }
+  const nm = allNames[best].replace(/^[RL]_/, "");
+  c.setHex(BONE_COL[nm] ?? 0xff00ff);
+  if (allNames[best].startsWith("L_")) c.offsetHSL(0.45, 0, 0); // 왼팔은 다른 색 계열(보라~분홍)
+  col.set([c.r, c.g, c.b], i * 3);
+}
+const wMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+const shots = [];
+const ctr = new THREE.Vector3(0, 150, 20);
+const shot = (label, az, weights) => {
+  mesh.material = weights ? wMat : [mFace, mBody];
+  if (weights) geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const dist = 900;
+  cam.position.set(ctr.x + dist * Math.sin(az), ctr.y + 60, ctr.z + dist * Math.cos(az)); cam.lookAt(ctr);
+  syncHelpers();
+  root.updateMatrixWorld(true);
+  R.render(scene, cam);
+  const cv = document.createElement("canvas"); cv.width = CW; cv.height = CH + 24;
+  const g = cv.getContext("2d"); g.fillStyle = "#222"; g.fillRect(0, 0, CW, 24); g.drawImage(R.domElement, 0, 24);
+  g.fillStyle = "#fff"; g.font = "14px sans-serif"; g.fillText(label, 8, 17);
+  shots.push(cv);
+};
+const B = (nm) => bones[allNames.indexOf(nm)];
+const reset = () => bones.forEach((b) => b.quaternion.identity());
+// 팔 겨누기: 어깨→손 방향을 dir 로 (뼈대에 회전이 없어 세계 좌표 그대로)
+const aim = (side, dir, bend = 0) => {
+  const j0 = allJoint[allNames.indexOf(side + "_Shoulder")], j1 = allJoint[allNames.indexOf(side + "_Hand")];
+  const rest = j1.clone().sub(j0).normalize();
+  B(side + "_Shoulder").quaternion.setFromUnitVectors(rest, new THREE.Vector3(...dir).normalize());
+  if (bend) B(side + "_Elbow").quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -bend);
+};
+reset();
+shot("가중치", 0, true);
+shot("가중치 · 3/4", 0.8, true);
+// 원본 그대로의 팔로 인사: 위팔은 살짝만(앞·옆으로) 들고, 팔꿈치를 굽혀 아래팔을 세우고, 아래팔·손목으로 까딱
+const Jn = (nm) => allJoint[allNames.indexOf(nm)];
+const elbowWave = (side, swing, lift = Number(QS.get("lift") || 0.35), out = Number(QS.get("out") || 0.25)) => {
+  const sg = side === "R" ? -1 : 1;
+  const qS = new THREE.Quaternion().setFromEuler(new THREE.Euler(-lift, 0, sg * out, "XYZ"));
+  B(side + "_Shoulder").quaternion.copy(qS);
+  const r0 = Jn(side + "_Hand").clone().sub(Jn(side + "_Elbow")).normalize();
+  const f = new THREE.Vector3(sg * Number(QS.get("foreOut") || 0.25) + swing * sg, 1, Number(QS.get("foreFwd") || 0.5)).normalize();
+  B(side + "_Elbow").quaternion.setFromUnitVectors(r0, f.clone().applyQuaternion(qS.clone().invert()));
+};
+reset(); elbowWave("L", -0.3);
+shot("인사 1", 0, false);
+reset(); elbowWave("L", 0.3);
+shot("인사 2", 0, false);
+reset(); elbowWave("L", 0); B("Head").rotation.set(0.05, 0.3, 0.1);
+shot("인사 · 고개", 0.25, false);
+shot("인사 · 3/4", 0.8, false);
+shot("인사 · 반대 3/4", -0.8, false);
+shot("인사 · 옆", 1.5, false);
+reset();
+geo.deleteAttribute("color");
+mesh.material = [mFace, mBody];
+const sheet = document.createElement("canvas"); sheet.width = CW * 4; sheet.height = (CH + 24) * Math.ceil(shots.length / 4);
+const sg = sheet.getContext("2d");
+shots.forEach((s, i) => sg.drawImage(s, (i % 4) * CW, Math.floor(i / 4) * (CH + 24)));
+document.body.appendChild(sheet); sheet.style.width = "100%";
+window.__sheet = sheet.toDataURL("image/png");
+
+// ── glb 저장 ──
+// ── 앱용 seat.bin (원본 메쉬 그대로 + 원본 가중치 + 왼팔 거울) — armsplit.html 과 같은 형식 ──
+const num = (k, d) => (QS.has(k) ? Number(QS.get(k)) : d);
+const P = Array.from({ length: n }, (_, i) => new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+const outF = [];
+for (const g of geo.groups) for (let t = g.start; t < g.start + g.count; t += 3) { const ix = (k) => (geo.index ? geo.index.getX(k) : k); outF.push([ix(t), ix(t + 1), ix(t + 2), g.materialIndex]); }
+async function exportSeat() {
+  // 검은 면 연결 덩어리
+  // 위치가 같은 정점은 하나로 (FBX 는 면마다 정점이 따로라 연결 덩어리를 못 찾음)
+  const canon = new Map(), cid = new Int32Array(P.length);
+  P.forEach((q, i) => { const k = `${Math.round(q.x * 100)},${Math.round(q.y * 100)},${Math.round(q.z * 100)}`; if (!canon.has(k)) canon.set(k, i); cid[i] = canon.get(k); });
+  const black = outF.filter((f) => f[3] === 0).map((f) => [cid[f[0]], cid[f[1]], cid[f[2]], 0]);
+  const par = new Map(); const find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+  for (const [a, b, c] of black) for (const v of [a, b, c]) if (!par.has(v)) par.set(v, v);
+  for (const [a, b, c] of black) { par.set(find(b), find(a)); par.set(find(c), find(a)); }
+  const comps = new Map();
+  for (const f of black) { const r = find(f[0]); (comps.get(r) ?? comps.set(r, []).get(r)).push(f); }
+  const parts = [...comps.values()].map((tris) => { const b = new THREE.Box3(); tris.forEach((t) => t.slice(0, 3).forEach((v) => b.expandByPoint(P[v]))); return { tris, b, c: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) }; })
+    .sort((a, b) => b.tris.length - a.tris.length).slice(0, 4);
+  const mouth = parts.reduce((a, b) => (b.size.y / b.size.x < a.size.y / a.size.x ? b : a));
+  const rest = parts.filter((q) => q !== mouth);
+  const nose = rest.reduce((a, b) => (b.tris.length > a.tris.length ? b : a));
+  const eyes = rest.filter((q) => q !== nose).sort((a, b) => a.c.x - b.c.x);
+  // pu_stand 눈
+  const objText = await (await fetch("/models/pu_stand.obj")).text();
+  const oldV = [], oldParts = {}; let cur = null;
+  for (const line of objText.split(/\r?\n/)) { const q = line.trim().split(/\s+/); if (q[0] === "v") oldV.push([+q[1], +q[2], +q[3]]); else if (q[0] === "o" || q[0] === "g") cur = q[1]; else if (q[0] === "f" && cur) (oldParts[cur] ??= new Set()).add(...q.slice(1).map((t) => +t.split("/")[0] - 1)); }
+  const oldEyes = Object.values(oldParts).map((set) => { const b = new THREE.Box3(); for (const i of set) b.expandByPoint(new THREE.Vector3(...oldV[i])); return b; })
+    .filter((b) => { const z = b.getSize(new THREE.Vector3()); return z.x < 6 && z.y < 6 && b.getCenter(new THREE.Vector3()).y > 140; }).map((b) => b.getCenter(new THREE.Vector3())).sort((a, b) => a.x - b.x);
+  const sc = oldEyes[1].distanceTo(oldEyes[0]) / eyes[1].c.distanceTo(eyes[0].c);
+  const newMid = eyes[0].c.clone().add(eyes[1].c).multiplyScalar(0.5), oldMid = oldEyes[0].clone().add(oldEyes[1]).multiplyScalar(0.5);
+  const T = (v) => v.clone().sub(newMid).multiplyScalar(sc).add(oldMid);
+  log.push(`앱 좌표: 배율 ${sc.toFixed(4)} · 눈 중간 ${newMid.toArray().map((x) => x.toFixed(0))} → ${oldMid.toArray().map((x) => x.toFixed(1))}`);
+  // 몸 = 모든 면 (검은 눈·코·입 자리 포함 — 빼면 구멍이 뚫려 작게 그린 눈알 둘레로 배경이 보임). 정점 다시 번호
+  const bodyF = outF;
+  const remap = new Map(), bp = [], bi4 = [], bw4 = [];
+  for (const f of bodyF) for (const v of f.slice(0, 3)) if (!remap.has(v)) { remap.set(v, remap.size); bp.push(...T(P[v]).toArray()); for (let k = 0; k < 4; k++) { bi4.push(SI[v * 4 + k]); bw4.push(SW[v * 4 + k]); } }
+  const bIdx = bodyF.flatMap((f) => f.slice(0, 3).map((v) => remap.get(v)));
+  // 눈·코·입 부품은 몸 표면에서 법선 쪽으로 조금 띄움 (몸이 같은 자리를 덮고 있어서 — 안 띄우면 털이 덮어 코가 하얗게 보임)
+  const LIFT = num("partLift", 0.45);
+  const partOut = (pt) => {
+    const nrm = new Map();
+    for (const t of pt.tris) { const [a, b, c] = t.slice(0, 3); const nn = P[b].clone().sub(P[a]).cross(P[c].clone().sub(P[a])); for (const v of [a, b, c]) nrm.set(v, (nrm.get(v) ?? new THREE.Vector3()).add(nn)); }
+    const m = new Map(), pp = [];
+    for (const t of pt.tris) for (const v of t.slice(0, 3)) if (!m.has(v)) { m.set(v, m.size); pp.push(...T(P[v]).addScaledVector(nrm.get(v).normalize(), LIFT).toArray()); }
+    return { pos: pp, idx: pt.tris.flatMap((t) => t.slice(0, 3).map((v) => m.get(v))) };
+  };
+  // 캐릭터 기준: 눈 x 가 + 쪽이 캐릭터 왼눈(L) — 앱 관례(eyeL = center.x > 0)
+  const faceParts = { eyeR: partOut(eyes[0]), eyeL: partOut(eyes[1]), nose: partOut(nose), mouth: partOut(mouth) };
+  const boneInfo = allNames.map((nm, i) => ({ name: nm, parent: allParent[i], pos: T(allJoint[i]).toArray().map((x) => +x.toFixed(4)), follow: bones[i].userData.follow ? { bone: bones[i].userData.follow.bone, frac: bones[i].userData.follow.frac } : undefined }));
+  const header = { version: 1, scale: sc, bones: boneInfo, body: { verts: bp.length / 3, tris: bIdx.length / 3 }, parts: Object.fromEntries(Object.entries(faceParts).map(([k, v]) => [k, { verts: v.pos.length / 3, tris: v.idx.length / 3 }])) };
+  const enc = new TextEncoder().encode(JSON.stringify(header));
+  const pad4 = (n) => (n + 3) & ~3;
+  const chunks = [new Float32Array(bp), new Uint32Array(bIdx), new Uint16Array(bi4), new Float32Array(bw4)];
+  for (const k of ["eyeL", "eyeR", "nose", "mouth"]) chunks.push(new Float32Array(faceParts[k].pos), new Uint32Array(faceParts[k].idx));
+  let size = 4 + pad4(enc.length); for (const c of chunks) size += pad4(c.byteLength);
+  const buf = new ArrayBuffer(size), dv = new DataView(buf); dv.setUint32(0, enc.length, true); new Uint8Array(buf, 4, enc.length).set(enc);
+  let off = 4 + pad4(enc.length);
+  for (const c of chunks) { new Uint8Array(buf, off, c.byteLength).set(new Uint8Array(c.buffer, c.byteOffset, c.byteLength)); off += pad4(c.byteLength); }
+  const r = await fetch("/__mimic/save-model?name=seat.bin", { method: "POST", body: buf });
+  log.push(`seat.bin ${(buf.byteLength / 1024).toFixed(0)}KB · 몸 ${header.body.verts}정점 · 부품 ${JSON.stringify(header.parts)} ${r.ok ? "저장됨" : "저장 실패"}`);
+}
+if (new URLSearchParams(location.search).has("save")) await exportSeat();
+const glb = await new GLTFExporter().parseAsync(root, { binary: true, onlyVisible: false });
+const r = new URLSearchParams(location.search).has("save") ? await fetch("/__mimic/save-model?name=seat_a.glb", { method: "POST", body: glb }) : { ok: false, status: "저장 안 함(?save 없음)" };
+log.push(`glb ${(glb.byteLength / 1024).toFixed(0)}KB → public/models/seat_a.glb ${r.ok ? "저장됨" : "저장 실패 " + r.status}`);
+document.getElementById("i").textContent = log.join("\n");
+window.__log = log; window.__ready = true;
+</script></body></html>

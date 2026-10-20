@@ -1,0 +1,96 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>에셋 상태 시트</title>
+<style>html,body{margin:0;background:#222;color:#fff;font:12px monospace}</style></head>
+<body><div id="i">loading…</div>
+<script type="module">
+// 개발 전용: asset/Puuvilla_V03 모델 상태를 한 장으로 (정면 · 3/4 · 옆 · 뒤)
+import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+const CW = 420, CH = 460;
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+R.setSize(CW, CH); R.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe8573a);
+scene.environment = new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 1.3));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(2, 3, 4); scene.add(key);
+const cam = new THREE.PerspectiveCamera(26, CW / CH, 0.1, 5000);
+const info = [];
+const white = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.75 });
+const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.35 });
+const knit = new THREE.MeshStandardMaterial({ color: 0xc9301b, roughness: 0.9 });
+const grey = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, roughness: 0.7 });
+
+// Seat_A: 기본 자세 = 지오메트리 그대로 (FBXLoader 가 관절 0.01 배율을 잘못 풀어 뼈대가 뭉치므로 스키닝 없이)
+const fbx = await new FBXLoader().loadAsync("/__asset/Puuvilla_V03/Puuvilla_Seat_A.fbx");
+let sk; fbx.traverse((m) => { if (m.isSkinnedMesh) sk = m; });
+const seatGeo = sk.geometry;
+const seat = new THREE.Group();
+seat.add(new THREE.Mesh(seatGeo, [black, white])); // 재질 0 = lambert1(눈·코·입), 1 = standardSurface1(몸)
+// 리깅: 정점 색 = 가장 큰 가중치의 본 색
+const BONE_COL = { BodyHold: 0xf2f2f2, Neck: 0x26c6da, Head: 0x3f6fff, R_Shoulder: 0x1b5e20, R_Elbow: 0x2e7d32, R_Forearm: 0x43a047, R_Wrist: 0x7cb342, R_Hand: 0xc0ca33, R_Thumb: 0xfdd835 };
+const bn = sk.skeleton.bones.map((b) => b.name.replace("F04_", "").replace("_JNT", ""));
+const si = seatGeo.getAttribute("skinIndex"), sw = seatGeo.getAttribute("skinWeight");
+const col = new Float32Array(si.count * 3), c = new THREE.Color();
+for (let i = 0; i < si.count; i++) {
+  let best = 0, bw = -1;
+  for (let k = 0; k < 4; k++) if (sw.getComponent(i, k) > bw) { bw = sw.getComponent(i, k); best = si.getComponent(i, k); }
+  c.setHex(BONE_COL[bn[best]] ?? 0xff00ff); col.set([c.r, c.g, c.b], i * 3);
+}
+const rigGeo = seatGeo.clone(); rigGeo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+const rig = new THREE.Group();
+rig.add(new THREE.Mesh(rigGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })));
+// 관절 위치 = boneInverse 의 역 (지오메트리 cm 단위로: boneInverse 는 cm → 본 좌표, 배율 100 포함)
+const jointPos = sk.skeleton.boneInverses.map((m) => new THREE.Vector3().setFromMatrixPosition(m.clone().invert()).multiplyScalar(100));
+const jg = new THREE.SphereGeometry(5, 12, 8);
+const jm = new THREE.MeshBasicMaterial({ color: 0xff2a6d, depthTest: false });
+jointPos.forEach((p) => { const s = new THREE.Mesh(jg, jm); s.position.copy(p); s.renderOrder = 9; rig.add(s); });
+const parentIdx = sk.skeleton.bones.map((b) => sk.skeleton.bones.indexOf(b.parent));
+const lp = []; parentIdx.forEach((pi, i) => { if (pi >= 0) lp.push(jointPos[pi], jointPos[i]); });
+const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lp), new THREE.LineBasicMaterial({ color: 0xff2a6d, depthTest: false }));
+lines.renderOrder = 9; rig.add(lines);
+info.push(`joints(cm): ${bn.map((n, i) => n + "@" + jointPos[i].toArray().map((v) => v.toFixed(0)).join(",")).join("  ")}`);
+
+// OBJ (줄인 미리보기본): 몸 + 목도리
+const ol = new OBJLoader();
+const objBody = await ol.loadAsync("/dev/tmp/v03_body.obj"), objScarf = await ol.loadAsync("/dev/tmp/v03_scarf.obj");
+const objG = new THREE.Group();
+for (const [o, m] of [[objBody, white], [objScarf, knit]]) o.traverse((x) => { if (x.isMesh) { x.material = m; x.geometry.computeVertexNormals(); } });
+objG.add(objBody, objScarf);
+
+// Lapu 3종 (실제 크기 비율 그대로 나란히)
+const lapu = new THREE.Group();
+let lx = 0;
+for (const n of ["22", "27", "32"]) {
+  const o = await new FBXLoader().loadAsync(`/__asset/Puuvilla_V03/Lapu_${n}cm.fbx`);
+  o.traverse((x) => { if (x.isMesh) x.material = grey; });
+  const b = new THREE.Box3().setFromObject(o);
+  o.position.x = lx - b.min.x; lx += b.max.x - b.min.x + 4; lapu.add(o);
+}
+lapu.position.x = -lx / 2;
+
+const rows = [["Seat_A (리깅본, 기본 자세)", seat], ["Seat_A 리깅: 색 = 가장 큰 영향 본 / 분홍 = 관절", rig], ["Puuvilla_A.obj (몸 + 목도리, 줄인 미리보기)", objG], ["Lapu 22 · 27 · 32cm", lapu]];
+const views = [["정면", 0], ["3/4", 0.75], ["옆", Math.PI / 2], ["뒤", Math.PI]];
+const sheet = document.createElement("canvas"); sheet.width = CW * 4; sheet.height = (CH + 26) * rows.length;
+const g2 = sheet.getContext("2d"); g2.fillStyle = "#222"; g2.fillRect(0, 0, sheet.width, sheet.height);
+for (const [, o] of rows) { o.visible = false; scene.add(o); }
+rows.forEach(([label, o], ri) => {
+  o.visible = true;
+  const b = new THREE.Box3().setFromObject(o), ctr = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  const r = Math.max(sz.x, sz.y, sz.z) * 0.62;
+  const dist = r / Math.sin((cam.fov * Math.PI) / 360);
+  views.forEach(([vn, az], vi) => {
+    cam.position.set(ctr.x + dist * Math.sin(az) * Math.cos(0.12), ctr.y + dist * Math.sin(0.12), ctr.z + dist * Math.cos(az) * Math.cos(0.12));
+    cam.lookAt(ctr); R.render(scene, cam);
+    g2.drawImage(R.domElement, vi * CW, ri * (CH + 26) + 26);
+    g2.fillStyle = "#fff"; g2.font = "15px sans-serif";
+    g2.fillText(vi === 0 ? `${label} · ${vn}` : vn, vi * CW + 8, ri * (CH + 26) + 18);
+  });
+  o.visible = false;
+});
+document.body.appendChild(sheet); sheet.style.width = "100%";
+document.getElementById("i").textContent = info.join("\n");
+window.__sheet = sheet.toDataURL("image/png"); window.__ready = true;
+</script></body></html>

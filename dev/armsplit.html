@@ -1,0 +1,933 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Seat_A 팔 분리</title>
+<style>html,body{margin:0;background:#222;color:#fff;font:12px monospace}#i{white-space:pre;padding:6px}</style></head>
+<body><div id="i">loading…</div>
+<script type="module">
+/**
+ * 개발 전용: Puuvilla_Seat_A.fbx 의 위팔이 몸통 옆면에 붙은 채 모델링돼 있어 팔을 들면 옆구리가 막처럼 늘어남 →
+ * 메쉬에서 팔을 떼어 냄 (봉제 인형 팔처럼 어깨에 끼운 별도 조각):
+ *  1) 팔 영역(열 확산 가중치 w ≥ 0.5, 면 단위)과 몸통을 가름 — 둘 사이 경계 고리
+ *  2) 몸통 구멍 = 고리 안을 동심 고리로 채우고 이중 라플라시안(얇은 판) 다듬기 → 주변 몸통 곡면이 이어지게
+ *  3) 팔 열린 쪽 = 같은 채움을 몸통 안쪽으로 둥글게 밀어 넣은 뚜껑 (가만히 있을 땐 몸통 속에 숨음)
+ *  4) 가중치: 몸통 = 몸·목·머리만, 팔 = 팔 본만(어깨~손), 뚜껑 = 어깨 → 팔을 들어도 몸통이 안 늘어남
+ *  오른쪽에서 만들고 왼쪽은 거울. 뼈대는 rigmirror 와 같음(관절 위치 = boneInverse 역, 회전 없음, 왼팔 = 미러).
+ * ?save=1 → public/models/seat_a.glb
+ */
+import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+const QS = new URLSearchParams(location.search);
+const num = (k, d) => (QS.has(k) ? Number(QS.get(k)) : d);
+const log = [];
+const fbx = await new FBXLoader().loadAsync("/__asset/Puuvilla_V03/Puuvilla_Seat_A.fbx");
+let sk;
+fbx.traverse((m) => { if (m.isSkinnedMesh) sk = m; });
+const src = sk.geometry;
+const oldBones = sk.skeleton.bones;
+const names = oldBones.map((b) => b.name.replace("F04_", "").replace("_JNT", ""));
+const joint = sk.skeleton.boneInverses.map((m) => new THREE.Vector3().setFromMatrixPosition(m.clone().invert()).multiplyScalar(100));
+const parent = oldBones.map((b) => oldBones.indexOf(b.parent));
+const SH = (QS.get("sh") || "-75,165,-4").split(",").map(Number);
+joint[names.indexOf("R_Shoulder")].set(SH[0], SH[1], SH[2]);
+const bi = (nm) => names.indexOf(nm);
+
+// ── 용접 메쉬 (위치 같은 정점 하나로) + 면 재질 ──
+const pos = src.getAttribute("position"), si = src.getAttribute("skinIndex"), sw = src.getAttribute("skinWeight");
+const n0 = pos.count;
+const wid = new Int32Array(n0), wmap = new Map(), V = [];
+for (let i = 0; i < n0; i++) {
+  const k = `${Math.round(pos.getX(i) * 100)},${Math.round(pos.getY(i) * 100)},${Math.round(pos.getZ(i) * 100)}`;
+  let id = wmap.get(k);
+  if (id === undefined) { id = V.length; wmap.set(k, id); V.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i))); }
+  wid[i] = id;
+}
+const NV = V.length;
+const idx = src.index;
+const triCount = (idx ? idx.count : n0) / 3;
+const corner = (t, c) => (idx ? idx.getX(t * 3 + c) : t * 3 + c);
+const faceMat = new Int8Array(triCount);
+for (const g of src.groups) for (let t = g.start / 3; t < (g.start + g.count) / 3; t++) faceMat[t] = g.materialIndex;
+const F = [];
+for (let t = 0; t < triCount; t++) F.push([wid[corner(t, 0)], wid[corner(t, 1)], wid[corner(t, 2)]]);
+// 원본 가중치 (용접 정점별 — 첫 정점 것)
+const OW = Array.from({ length: NV }, () => new Map());
+const seen = new Uint8Array(NV);
+for (let i = 0; i < n0; i++) {
+  const v = wid[i]; if (seen[v]) continue; seen[v] = 1;
+  for (let k = 0; k < 4; k++) { const ww = sw.getComponent(i, k); if (ww > 0) OW[v].set(names[si.getComponent(i, k)], (OW[v].get(names[si.getComponent(i, k)]) || 0) + ww); }
+}
+const nb = Array.from({ length: NV }, () => new Set());
+for (const [a, b, c] of F) { nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+// 거울 짝
+const mir = new Int32Array(NV).fill(-1);
+for (let v = 0; v < NV; v++) { const k = `${Math.round(-V[v].x * 100)},${Math.round(V[v].y * 100)},${Math.round(V[v].z * 100)}`; mir[v] = wmap.get(k) ?? -1; }
+log.push(`용접 정점 ${NV} · 면 ${triCount} · 거울 짝 없음 ${[...mir].filter((x) => x < 0).length}`);
+
+// ── 오른팔 영역 w (열 확산, rigmirror 와 같은 방식) ──
+const chainNames = ["R_Shoulder", "R_Elbow", "R_Forearm", "R_Wrist", "R_Hand"];
+const J = chainNames.map((nm) => joint[bi(nm)]);
+const pts = [...J, J[4].clone().add(J[4].clone().sub(J[3]).multiplyScalar(0.8))];
+const segInfo = (q) => {
+  let best = { d: Infinity, s: 0, t: 0 };
+  for (let k = 0; k < pts.length - 1; k++) {
+    const a = pts[k], ab = pts[k + 1].clone().sub(a);
+    const t = Math.min(1, Math.max(0, q.clone().sub(a).dot(ab) / ab.lengthSq()));
+    const d = a.clone().addScaledVector(ab, t).distanceTo(q);
+    if (d < best.d) best = { d, s: k, t };
+  }
+  return best;
+};
+const info = V.map((q) => segInfo(q));
+const armOf = (v) => { let a = 0; for (const [nm, ww] of OW[v]) if (nm.startsWith("R_")) a += ww; return a; };
+const headOf = (v) => (OW[v].get("Head") || 0) + (OW[v].get("Neck") || 0);
+const ARM_FROM = num("armFrom", 0.7), BODY_X = num("bodyX", -50);
+const w = new Float32Array(NV), fixed = new Int8Array(NV);
+for (let v = 0; v < NV; v++) {
+  const q = V[v], along = info[v].s + info[v].t;
+  if (along >= ARM_FROM && armOf(v) > 0.5) { fixed[v] = 1; w[v] = 1; }
+  else if (q.x > BODY_X || q.y < 35 || headOf(v) > 0.3 || (info[v].d > 44 && armOf(v) < 0.05)) { fixed[v] = 1; w[v] = 0; }
+  else w[v] = armOf(v);
+}
+for (let it = 0; it < 160; it++) {
+  const nw = new Float32Array(NV);
+  for (let v = 0; v < NV; v++) { if (fixed[v]) { nw[v] = w[v]; continue; } let s = 0; for (const u of nb[v]) s += w[u]; nw[v] = s / nb[v].size; }
+  w.set(nw);
+}
+const CUT = num("cut", 0.7);
+// 왼쪽 w = 거울 짝의 w (짝이 없으면 거울 위치에 가장 가까운 정점)
+const wL = new Float32Array(NV);
+for (let v = 0; v < NV; v++) {
+  let m = mir[v];
+  if (m < 0) { let bd = Infinity; const q = new THREE.Vector3(-V[v].x, V[v].y, V[v].z); for (let u = 0; u < NV; u++) { const d = V[u].distanceToSquared(q); if (d < bd) { bd = d; m = u; } } }
+  wL[v] = w[m];
+}
+const eF = new Map();
+F.forEach(([a, b, c], t) => { for (const [x, y] of [[a, b], [b, c], [c, a]]) { const k = x < y ? `${x},${y}` : `${y},${x}`; (eF.get(k) ?? eF.set(k, []).get(k)).push(t); } });
+const fnb = F.map(([a, b, c]) => [[a, b], [b, c], [c, a]].flatMap(([x, y]) => eF.get(x < y ? `${x},${y}` : `${y},${x}`)).filter((u) => u !== undefined));
+const classify = (ww, sideSign) => {
+  const fa = F.map(([a, b, c]) => (ww[a] + ww[b] + ww[c]) / 3 >= CUT && (V[a].x + V[b].x + V[c].x) * sideSign > 0);
+  for (let it = 0; it < 3; it++) {
+    const cp = fa.slice();
+    F.forEach((_, t) => { const others = fnb[t].filter((u) => u !== t); const arm = others.filter((u) => cp[u]).length; if (arm >= 2 && !cp[t]) fa[t] = true; if (arm <= 1 && cp[t] && others.length >= 3) fa[t] = false; });
+  }
+  // 가장 큰 연결 덩어리만 팔 (손 근처 작은 섬 제거)
+  const comp = new Int32Array(F.length).fill(-1); let best = -1, bestN = 0, cid = 0;
+  for (let t = 0; t < F.length; t++) {
+    if (!fa[t] || comp[t] >= 0) continue;
+    const st = [t]; comp[t] = cid; let cnt = 0;
+    while (st.length) { const u = st.pop(); cnt++; for (const x of fnb[u]) if (fa[x] && comp[x] < 0) { comp[x] = cid; st.push(x); } }
+    if (cnt > bestN) { bestN = cnt; best = cid; } cid++;
+  }
+  return fa.map((x, t) => x && comp[t] === best);
+};
+const faceArmR = classify(w, -1), faceArmL = classify(wL, 1);
+const faceSide = F.map((_, t) => (faceArmR[t] ? "R" : faceArmL[t] ? "L" : ""));
+log.push(`팔 면: 오른쪽 ${faceArmR.filter(Boolean).length} · 왼쪽 ${faceArmL.filter(Boolean).length}`);
+
+// ── 경계 고리 (몸통 면과 팔 면이 맞닿은 모서리) ──
+const loopsOf = (side) => {
+  const half = new Map(); // 몸통 쪽 방향 모서리 a→b (몸통 면 기준 감김)
+  F.forEach(([a, b, c], t) => {
+    if (faceSide[t] === side) return;
+    for (const [x, y] of [[a, b], [b, c], [c, a]]) half.set(`${x},${y}`, [x, y]);
+  });
+  const nextOf = new Map();
+  F.forEach(([a, b, c], t) => {
+    if (faceSide[t] !== side) return;
+    // 팔 면의 모서리 y→x 가 몸통 면에 x→y 로 있으면 경계 (몸통 쪽 감김 방향 x→y 의 반대 = 구멍 감김)
+    for (const [x, y] of [[a, b], [b, c], [c, a]]) if (half.has(`${y},${x}`)) nextOf.set(x, y);
+  });
+  const loops = [], used = new Set();
+  for (const s of nextOf.keys()) {
+    if (used.has(s)) continue;
+    const L = []; let v = s;
+    while (v !== undefined && !used.has(v)) { used.add(v); L.push(v); v = nextOf.get(v); }
+    if (L.length > 2) loops.push(L);
+  }
+  return loops;
+};
+const loopsR = loopsOf("R"), loopsL = loopsOf("L");
+log.push(`경계 고리: 오른쪽 ${loopsR.map((l) => l.length).join(",")} · 왼쪽 ${loopsL.map((l) => l.length).join(",")}`);
+
+// ── 새 메쉬 만들기 ──
+// 정점: 몸통용 원래 정점(V) + 팔 조각용 복제(팔 면 정점) + 채움·뚜껑 정점
+const P = V.map((v) => v.clone());
+const Wt = Array.from({ length: NV }, () => new Map()); // 정점 가중치 (본 이름 → 값)
+const outF = []; // [a,b,c,mat]
+const bodyW = (v) => { const m = new Map(); let s = 0; for (const [nm, ww] of OW[v]) if (!nm.startsWith("R_")) { m.set(nm, ww); s += ww; } if (s < 1e-6) return new Map([["BodyHold", 1]]); for (const k of m.keys()) m.set(k, m.get(k) / s); return m; };
+// 팔 안 본 나눔 (사슬 위치)
+const armW = (v, side) => {
+  const q = side === "R" ? V[v] : new THREE.Vector3(-V[v].x, V[v].y, V[v].z);
+  const sI = segInfo(q), along = sI.s + sI.t;
+  const k0 = Math.min(4, Math.floor(along)), f = along - Math.floor(along);
+  const blend = f < 0.25 && k0 > 0 ? 0.5 - f * 2 : f > 0.75 && k0 < 4 ? (f - 0.75) * 2 : 0;
+  const other = Math.max(0, Math.min(4, f < 0.5 ? k0 - 1 : k0 + 1));
+  const m = new Map();
+  const thumbJ = joint[bi("R_Thumb")];
+  if (q.distanceTo(thumbJ) < 12 && along > 3.6) { m.set(side + "_Thumb", 1); return m; }
+  m.set(side + "_" + chainNames[k0].slice(2), 1 - blend);
+  if (blend > 0) m.set(side + "_" + chainNames[other].slice(2), (m.get(side + "_" + chainNames[other].slice(2)) || 0) + blend);
+  return m;
+};
+// 몸통 면 그대로
+const bodyVert = new Set();
+F.forEach(([a, b, c], t) => { if (!faceSide[t]) { outF.push([a, b, c, faceMat[t]]); bodyVert.add(a).add(b).add(c); } });
+for (const v of bodyVert) Wt[v] = bodyW(v);
+// 팔 조각: 정점 복제 (?arm=mesh 일 때만 — 기본은 아래 SDF 팔)
+const ARM_MODE = QS.get("arm") || "loft";
+const armCopy = { R: new Map(), L: new Map() };
+for (const side of ARM_MODE === "mesh" ? ["R", "L"] : []) {
+  F.forEach(([a, b, c], t) => {
+    if (faceSide[t] !== side) return;
+    const m = [a, b, c].map((v) => {
+      let id = armCopy[side].get(v);
+      if (id === undefined) { id = P.length; P.push(V[v].clone()); Wt.push(armW(v, side)); armCopy[side].set(v, id); }
+      return id;
+    });
+    outF.push([...m, faceMat[t]]);
+  });
+}
+// 채움: 고리 → 동심 고리 + 이중 라플라시안 다듬기
+const RINGS = num("rings", 7), DEPTH = num("depth", 0.9);
+const fillLoop = (loop, side) => {
+  const N = loop.length;
+  const c = new THREE.Vector3(); loop.forEach((v) => c.add(V[v])); c.divideScalar(N);
+  // 바깥 방향 = 고리 둘레 몸통 정점 법선 대신: 중심에서 몸 중심축(x=0) 반대쪽 + 고리 평면 법선
+  let nOut = new THREE.Vector3();
+  for (let i = 0; i < N; i++) { const a = V[loop[i]].clone().sub(c), b = V[loop[(i + 1) % N]].clone().sub(c); nOut.add(a.cross(b)); }
+  nOut.normalize();
+  if (nOut.x * (side === "R" ? -1 : 1) < 0) nOut.negate();
+  const rad = loop.reduce((s, v) => s + V[v].distanceTo(c), 0) / N;
+  // 몸통 채움 정점
+  const ring = [loop.slice()];
+  for (let r = 1; r < RINGS; r++) {
+    const f = r / RINGS, row = [];
+    for (let i = 0; i < N; i++) { row.push(P.length); P.push(V[loop[i]].clone().lerp(c, f)); Wt.push(null); }
+    ring.push(row);
+  }
+  const center = P.length; P.push(c.clone()); Wt.push(null);
+  const fillIds = ring.slice(1).flat().concat([center]);
+  const tris = [];
+  for (let r = 0; r < RINGS - 1; r++) for (let i = 0; i < N; i++) {
+    const a = ring[r][i], b = ring[r][(i + 1) % N], c2 = ring[r + 1][i], d = ring[r + 1][(i + 1) % N];
+    tris.push([a, b, d], [a, d, c2]);
+  }
+  for (let i = 0; i < N; i++) tris.push([ring[RINGS - 1][i], ring[RINGS - 1][(i + 1) % N], center]);
+  // 다듬기: 고리 + 몸통 이웃 고정, 채움 정점만 이중 라플라시안
+  const adj = new Map();
+  const addE = (x, y) => { (adj.get(x) ?? adj.set(x, new Set()).get(x)).add(y); };
+  for (const [x, y, z] of tris) { addE(x, y); addE(y, x); addE(y, z); addE(z, y); addE(z, x); addE(x, z); }
+  for (const v of loop) for (const u of nb[v]) if (bodyVert.has(u)) { addE(v, u); addE(u, v); for (const u2 of nb[u]) if (bodyVert.has(u2)) addE(u, u2); }
+  const lap = (v) => { const s = new THREE.Vector3(); const A = adj.get(v); A.forEach((u) => s.add(P[u])); return s.divideScalar(A.size).sub(P[v]); };
+  const free = new Set(fillIds);
+  for (let it = 0; it < num("fairIt", 1500); it++) {
+    const L1 = new Map();
+    for (const v of adj.keys()) L1.set(v, lap(v));
+    for (const v of free) {
+      const A = adj.get(v); const s = new THREE.Vector3(); A.forEach((u) => s.add(L1.get(u))); s.divideScalar(A.size).sub(L1.get(v));
+      P[v].addScaledVector(s, -0.12);
+    }
+  }
+  // 감김: 몸통 채움은 nOut 쪽을 바라보게
+  const orient = (t) => { const [x, y, z] = t; const nn = P[y].clone().sub(P[x]).cross(P[z].clone().sub(P[x])); return nn.dot(nOut) >= 0 ? t : [x, z, y]; };
+  const bodyMat = 1;
+  for (const t of tris) outF.push([...orient(t), bodyMat]);
+  // 채움 가중치: 고리 정점들의 몸 가중치 평균
+  const avg = new Map(); loop.forEach((v) => { for (const [k, x] of Wt[v]) avg.set(k, (avg.get(k) || 0) + x / N); });
+  for (const v of fillIds) Wt[v] = new Map(avg);
+  if (ARM_MODE !== "mesh" || QS.get("cap") === "0") return { N, rad: rad.toFixed(1), c: c.toArray().map((x) => +x.toFixed(0)) };
+  // 팔 뚜껑: 채움 모양을 몸통 안쪽으로 둥글게 (고리에서 0, 가운데서 DEPTH × 반경)
+  const copy = armCopy[side];
+  const capRing = [loop.map((v) => copy.get(v))];
+  // 높이 h = 채움 점 위(nOut 쪽) 팔 바깥 면까지 거리 — 팔 조각 정점 중 그 점 근처(옆으로 6cm 안)에서 가장 높은 것
+  const armPts = [...copy.keys()].map((v) => V[v]);
+  const heightAt = (p) => {
+    let h = 0;
+    for (const q of armPts) { const d = q.clone().sub(p), up = d.dot(nOut); if (up <= 0) continue; const lat = d.addScaledVector(nOut, -up).length(); if (lat < 6) h = Math.max(h, up); }
+    return h;
+  };
+  const H = ring.map((row) => row.map((v) => heightAt(P[v])));
+  const hC = heightAt(P[center]);
+  // 고리 따라 부드럽게
+  for (let it = 0; it < 3; it++) for (let r = 1; r < RINGS; r++) { const row = H[r].slice(); for (let i = 0; i < N; i++) H[r][i] = (row[(i + N - 1) % N] + 2 * row[i] + row[(i + 1) % N]) / 4; }
+  for (let r = 1; r < RINGS; r++) {
+    const row = [];
+    for (let i = 0; i < N; i++) { row.push(P.length); P.push(P[ring[r][i]].clone().addScaledVector(nOut, -DEPTH * H[r][i])); Wt.push(new Map([[side + "_Shoulder", 1]])); }
+    capRing.push(row);
+  }
+  const capC = P.length; P.push(P[center].clone().addScaledVector(nOut, -DEPTH * hC)); Wt.push(new Map([[side + "_Shoulder", 1]]));
+  for (let r = 0; r < RINGS - 1; r++) for (let i = 0; i < N; i++) {
+    const a = capRing[r][i], b = capRing[r][(i + 1) % N], c2 = capRing[r + 1][i], d = capRing[r + 1][(i + 1) % N];
+    outF.push([a, d, b, bodyMat], [a, c2, d, bodyMat]); // 뚜껑은 몸통 안쪽(−nOut)을 바라봄 = 팔 바깥
+  }
+  for (let i = 0; i < N; i++) outF.push([capRing[RINGS - 1][i], capC, capRing[RINGS - 1][(i + 1) % N], bodyMat]);
+  return { N, rad: rad.toFixed(1), c: c.toArray().map((x) => +x.toFixed(0)) };
+};
+const fillInfo = [];
+for (const L of loopsR) fillInfo.push("R " + JSON.stringify(fillLoop(L, "R")));
+for (const L of loopsL) fillInfo.push("L " + JSON.stringify(fillLoop(L, "L")));
+// 이음매 다듬기: 잘린 고리는 원본 정점 모서리를 따라 들쭉날쭉(아래 끝이 V 자로 패임) → 고리와 그 주변 2 고리를 Taubin 으로
+{
+  const tadj = new Map(); const add = (x, y) => (tadj.get(x) ?? tadj.set(x, new Set()).get(x)).add(y);
+  for (const [a, b, c] of outF) { add(a, b); add(a, c); add(b, a); add(b, c); add(c, a); add(c, b); }
+  const sel = new Set([...loopsR, ...loopsL].flat());
+  for (let r = 0; r < 2; r++) for (const v of [...sel]) for (const u of tadj.get(v) || []) sel.add(u);
+  for (let it = 0; it < num("seamIt", 25); it++) for (const lam of [0.5, -0.53]) {
+    const D = new Map();
+    for (const v of sel) { const A = tadj.get(v); if (!A) continue; const m = new THREE.Vector3(); A.forEach((u) => m.add(P[u])); D.set(v, m.divideScalar(A.size).sub(P[v])); }
+    for (const [v, d] of D) P[v].addScaledVector(d, lam);
+  }
+  log.push(`이음매 다듬기: 정점 ${sel.size}`);
+}
+log.push("채움: " + fillInfo.join(" | "));
+
+// ── SDF 팔 (?arm=sdf, 기본) ──
+// 원본 팔은 위쪽 절반이 몸통 옆면이라 떼어 내면 반쪽 관 + 구겨진 뚜껑이 됨 → 팔 전체를 매끈한 닫힌 면으로 새로 만듦:
+// 뼈 사슬(어깨 회전 중심 → 팔꿈치 → 아래팔 → 손목 → 손 → 손끝)을 따라 원본에서 잰 반지름의 둥근 원뿔들을 부드럽게 합치고
+// 엄지 + 어깨 공(몸통 속)을 더한 거리장 → Surface Nets 로 면 → 다듬기. 오른쪽에서 만들어 왼쪽은 거울.
+if (ARM_MODE === "sdf") {
+  // 축·반지름 재기: 몸에서 떨어진 팔(along ≥ 1.1, 원본 팔 가중치 큼) 정점을 사슬 위치 칸으로 나눠
+  // 칸마다 중심(평균)과 반지름(중심까지 거리 중앙값) — 뼈 사슬이 팔 한가운데가 아니어서 사슬 기준으로 재면 뚱뚱해짐
+  const BIN = 0.2, FREE = num("free", 1.1), nBin = Math.ceil(5.2 / BIN) + 1;
+  const binPts = Array.from({ length: nBin }, () => []);
+  for (let v = 0; v < NV; v++) {
+    if (V[v].x > 0 || armOf(v) < 0.9) continue;
+    const sI = info[v], along = sI.s + sI.t;
+    if (along < FREE) continue;
+    binPts[Math.min(nBin - 1, Math.round(along / BIN))].push(V[v]);
+  }
+  const axis = [], radii = [];
+  for (let b = 0; b < nBin; b++) {
+    const L = binPts[b]; if (L.length < 6) continue;
+    const c = new THREE.Vector3(); L.forEach((p) => c.add(p)); c.divideScalar(L.length);
+    const ds = L.map((p) => p.distanceTo(c)).sort((x, y) => x - y);
+    axis.push(c); radii.push(ds[Math.floor(ds.length * num("rq", 0.6))]);
+  }
+  // 부드럽게
+  for (let it = 0; it < 2; it++) for (let k = 1; k < axis.length - 1; k++) { axis[k] = axis[k - 1].clone().add(axis[k].clone().multiplyScalar(2)).add(axis[k + 1]).multiplyScalar(0.25); radii[k] = (radii[k - 1] + 2 * radii[k] + radii[k + 1]) / 4; }
+  // 위팔: 어깨 회전 중심 → 첫 칸 중심, 반지름은 첫 칸에서 어깨 쪽으로 조금 굵게
+  const r0 = radii[0] * num("upperMax", 1.15);
+  const pivot = joint[bi("R_Shoulder")].clone();
+  const upPts = [pivot, pivot.clone().lerp(axis[0], 0.5)];
+  const allAxis = [...upPts, ...axis], allR = [r0, (r0 + radii[0]) / 2, ...radii];
+  log.push("팔 축 칸 " + axis.length + " · 반지름(cm, 어깨→손끝): " + allR.map((r) => r.toFixed(0)).join(" "));
+  const segs = [];
+  for (let k = 0; k < allAxis.length - 1; k++) segs.push([allAxis[k], allAxis[k + 1], allR[k], allR[k + 1]]);
+  const rad = allR;
+  const thumbJ = joint[bi("R_Thumb")], handJ = joint[bi("R_Hand")];
+  const thumbTip = thumbJ.clone().add(thumbJ.clone().sub(handJ).normalize().multiplyScalar(6));
+  const rThumb = num("thumbR", 7);
+  const capsule = (q, a, b, ra, rb) => { const ab = b.clone().sub(a), t = Math.min(1, Math.max(0, q.clone().sub(a).dot(ab) / ab.lengthSq())); return a.clone().addScaledVector(ab, t).distanceTo(q) - (ra + (rb - ra) * t); };
+  const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+  const sdf = (q) => {
+    let d = Infinity;
+    for (const [a, b, ra, rb] of segs) d = smin(d, capsule(q, a, b, ra, rb), 2);
+    d = smin(d, capsule(q, handJ, thumbTip, rThumb, rThumb * 0.85), 5);
+    return d;
+  };
+  // Surface Nets
+  const CELL = num("cell", 2);
+  const bb = new THREE.Box3(); for (const pp of [...allAxis, thumbTip]) bb.expandByPoint(pp); bb.expandByScalar(Math.max(...rad) + 6);
+  const nx = Math.ceil((bb.max.x - bb.min.x) / CELL) + 1, ny = Math.ceil((bb.max.y - bb.min.y) / CELL) + 1, nz = Math.ceil((bb.max.z - bb.min.z) / CELL) + 1;
+  const field = new Float32Array(nx * ny * nz), gi = (x, y, z) => (z * ny + y) * nx + x;
+  const q = new THREE.Vector3();
+  for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) field[gi(x, y, z)] = sdf(q.set(bb.min.x + x * CELL, bb.min.y + y * CELL, bb.min.z + z * CELL));
+  const cellV = new Int32Array((nx - 1) * (ny - 1) * (nz - 1)).fill(-1), ci = (x, y, z) => (z * (ny - 1) + y) * (nx - 1) + x;
+  const SP = [];
+  const corners = [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]];
+  const edges = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+  for (let z = 0; z < nz - 1; z++) for (let y = 0; y < ny - 1; y++) for (let x = 0; x < nx - 1; x++) {
+    const val = corners.map(([dx, dy, dz]) => field[gi(x + dx, y + dy, z + dz)]);
+    let inside = 0; for (const vv of val) if (vv < 0) inside++;
+    if (inside === 0 || inside === 8) continue;
+    const acc = new THREE.Vector3(); let cnt = 0;
+    for (const [e0, e1] of edges) {
+      const a0 = val[e0], a1 = val[e1]; if ((a0 < 0) === (a1 < 0)) continue;
+      const t = a0 / (a0 - a1), c0 = corners[e0], c1 = corners[e1];
+      acc.add(new THREE.Vector3(x + c0[0] + (c1[0] - c0[0]) * t, y + c0[1] + (c1[1] - c0[1]) * t, z + c0[2] + (c1[2] - c0[2]) * t)); cnt++;
+    }
+    acc.divideScalar(cnt);
+    cellV[ci(x, y, z)] = SP.length;
+    SP.push(new THREE.Vector3(bb.min.x + acc.x * CELL, bb.min.y + acc.y * CELL, bb.min.z + acc.z * CELL));
+  }
+  const SF = [];
+  const quad = (a, b, c, d, flip) => { if (a < 0 || b < 0 || c < 0 || d < 0) return; if (flip) SF.push([a, c, b], [a, d, c]); else SF.push([a, b, c], [a, c, d]); };
+  for (let z = 1; z < nz - 1; z++) for (let y = 1; y < ny - 1; y++) for (let x = 1; x < nx - 1; x++) {
+    const v0 = field[gi(x, y, z)];
+    for (const [dx, dy, dz] of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+      if (x + dx >= nx || y + dy >= ny || z + dz >= nz) continue;
+      const v1 = field[gi(x + dx, y + dy, z + dz)]; if ((v0 < 0) === (v1 < 0)) continue;
+      const flip = v0 < 0;
+      if (dx) quad(cellV[ci(x, y - 1, z - 1)], cellV[ci(x, y, z - 1)], cellV[ci(x, y, z)], cellV[ci(x, y - 1, z)], flip);
+      else if (dy) quad(cellV[ci(x - 1, y, z - 1)], cellV[ci(x - 1, y, z)], cellV[ci(x, y, z)], cellV[ci(x, y, z - 1)], flip);
+      else quad(cellV[ci(x - 1, y - 1, z)], cellV[ci(x, y - 1, z)], cellV[ci(x, y, z)], cellV[ci(x - 1, y, z)], flip);
+    }
+  }
+  // 다듬기 (Taubin — 부피 유지)
+  const snb = Array.from({ length: SP.length }, () => new Set());
+  for (const [a, b, c] of SF) { snb[a].add(b).add(c); snb[b].add(a).add(c); snb[c].add(a).add(b); }
+  for (let it = 0; it < 8; it++) for (const lam of [0.5, -0.53]) {
+    const D = SP.map((p, i) => { const sAcc = new THREE.Vector3(); snb[i].forEach((u) => sAcc.add(SP[u])); return sAcc.divideScalar(Math.max(1, snb[i].size)).sub(p); });
+    SP.forEach((p, i) => p.addScaledVector(D[i], lam));
+  }
+
+  // 원본 겉면에 붙이기: 둥근 팔 정점 중 원본 팔 겉면(바깥에서 보이는 쪽) 가까이 있는 것은 그 면 위로 옮김
+  // → 가만히 있을 때 원본과 같은 모양(앞발·엄지 포함), 원본에 없던 안쪽(몸통에 붙어 있던 쪽)만 둥근 면.
+  {
+    const armTris = [];
+    F.forEach((f, t) => { if (faceSide[t] === "R") armTris.push(f.map((v) => V[v])); });
+    const tN = armTris.map(([a, b, c]) => b.clone().sub(a).cross(c.clone().sub(a)).normalize());
+    const G = 6, grid = new Map(), gk = (x, y, z) => `${Math.floor(x / G)},${Math.floor(y / G)},${Math.floor(z / G)}`;
+    armTris.forEach(([a, b, c], t) => {
+      const mn = a.clone().min(b).min(c), mx = a.clone().max(b).max(c);
+      for (let x = Math.floor(mn.x / G); x <= Math.floor(mx.x / G); x++) for (let y = Math.floor(mn.y / G); y <= Math.floor(mx.y / G); y++) for (let z = Math.floor(mn.z / G); z <= Math.floor(mx.z / G); z++) {
+        const k = `${x},${y},${z}`; (grid.get(k) ?? grid.set(k, []).get(k)).push(t);
+      }
+    });
+    const tri = new THREE.Triangle(), cp = new THREE.Vector3();
+    const sN = SP.map(() => new THREE.Vector3());
+    for (const [a, b, c] of SF) { const nn = SP[b].clone().sub(SP[a]).cross(SP[c].clone().sub(SP[a])); sN[a].add(nn); sN[b].add(nn); sN[c].add(nn); }
+    sN.forEach((v) => v.normalize());
+    const NEAR = num("snapNear", 3), FAR = num("snapFar", 8);
+    let snapped = 0;
+    const target = SP.map((p, i) => {
+      let best = null, bd = Infinity;
+      const cx = Math.floor(p.x / G), cy = Math.floor(p.y / G), cz = Math.floor(p.z / G);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+        const l = grid.get(`${cx + dx},${cy + dy},${cz + dz}`); if (!l) continue;
+        for (const t of l) {
+          if (tN[t].dot(sN[i]) * num("snapSign", 1) < 0.3) continue; // 같은 쪽을 보는 면만 (안쪽 정점이 몸통 옆면에 붙지 않게)
+          tri.set(...armTris[t]); tri.closestPointToPoint(p, cp);
+          const d = cp.distanceTo(p); if (d < bd) { bd = d; best = cp.clone(); }
+        }
+      }
+      if (!best || bd > FAR) return null;
+      const k = bd <= NEAR ? 1 : 1 - (bd - NEAR) / (FAR - NEAR);
+      return [best, k];
+    });
+    target.forEach((tg, i) => { if (tg) { SP[i].lerp(tg[0], tg[1]); snapped++; } });
+    // 붙인 곳과 안 붙인 곳 사이만 살짝 다듬기
+    const sadj = Array.from({ length: SP.length }, () => new Set());
+    for (const [a, b, c] of SF) { sadj[a].add(b).add(c); sadj[b].add(a).add(c); sadj[c].add(a).add(b); }
+    const edge = SP.map((_, i) => { const me = !!target[i] && target[i][1] > 0.99; for (const u of sadj[i]) if ((!!target[u] && target[u][1] > 0.99) !== me) return true; return false; });
+    for (let it = 0; it < 4; it++) for (const lam of [0.5, -0.53]) {
+      const D = SP.map((p, i) => { if (!edge[i]) return null; const m = new THREE.Vector3(); sadj[i].forEach((u) => m.add(SP[u])); return m.divideScalar(sadj[i].size).sub(p); });
+      D.forEach((d, i) => d && SP[i].addScaledVector(d, lam));
+    }
+    log.push(`원본 겉면에 붙인 정점 ${snapped}/${SP.length}`);
+  }
+  log.push(`SDF 팔: 격자 ${nx}×${ny}×${nz} · 정점 ${SP.length} · 면 ${SF.length}`);
+  for (const side of ["R", "L"]) {
+    const base = P.length;
+    for (const p of SP) {
+      const pp = side === "R" ? p.clone() : new THREE.Vector3(-p.x, p.y, p.z);
+      P.push(pp);
+      // 가중치: 사슬 위치로 (armW 는 원본 정점 번호용이라 직접)
+      const qq = side === "R" ? pp : new THREE.Vector3(-pp.x, pp.y, pp.z);
+      const sI = segInfo(qq), along = sI.s + sI.t;
+      const k0 = Math.min(4, Math.floor(along)), f = along - Math.floor(along);
+      const blend = f < 0.25 && k0 > 0 ? 0.5 - f * 2 : f > 0.75 && k0 < 4 ? (f - 0.75) * 2 : 0;
+      const other = Math.max(0, Math.min(4, f < 0.5 ? k0 - 1 : k0 + 1));
+      const m = new Map();
+      if (qq.distanceTo(thumbJ) < 9 && along > 3.6) m.set(side + "_Thumb", 1);
+      else { m.set(side + "_" + chainNames[k0].slice(2), 1 - blend); if (blend > 0) m.set(side + "_" + chainNames[other].slice(2), (m.get(side + "_" + chainNames[other].slice(2)) || 0) + blend); }
+      Wt.push(m);
+    }
+    for (const [a, b, c] of SF) outF.push(side === "R" ? [base + a, base + b, base + c, 1] : [base + a, base + c, base + b, 1]);
+  }
+  window.__armSdf = { rad, SP: SP.length };
+}
+
+// ── 단면 로프트 팔 (?arm=loft, 기본) ──
+// 팔 축을 따라 2cm 마다 단면 고리를 만들고, 각 고리에서 32 방향으로 광선을 쏴 원본 팔 겉면에 닿는 거리를 잼
+// → 원본 겉면이 있는 방향은 원본 모양 그대로(가만히 있을 때 원본과 같음, 엄지 혹 포함), 몸통에 붙어 있던(겉면 없는) 방향은
+//   양옆 방향 값으로 메움. 고리를 이어 매끈한 관 + 양 끝 둥근 마개. 오른쪽에서 만들어 왼쪽은 거울.
+if (ARM_MODE === "loft") {
+  const armTris = [];
+  F.forEach((f, t) => { if (faceSide[t] === "R") armTris.push(f.map((v) => V[v])); });
+  // 축: 몸에서 떨어진 팔 칸 중심들 + 어깨 회전 중심
+  const BIN = 0.2, FREE = num("free", 1.1), nBin = Math.ceil(5.4 / BIN) + 1, binPts = Array.from({ length: nBin }, () => []);
+  for (let v = 0; v < NV; v++) {
+    if (V[v].x > 0 || armOf(v) < 0.9) continue;
+    const sI = info[v], along = sI.s + sI.t; if (along < FREE) continue;
+    binPts[Math.min(nBin - 1, Math.round(along / BIN))].push(V[v]);
+  }
+  let axis = [];
+  for (const L of binPts) { if (L.length < 6) continue; const c = new THREE.Vector3(); L.forEach((q) => c.add(q)); axis.push(c.divideScalar(L.length)); }
+  for (let it = 0; it < 3; it++) for (let k = 1; k < axis.length - 1; k++) axis[k] = axis[k - 1].clone().add(axis[k].clone().multiplyScalar(2)).add(axis[k + 1]).multiplyScalar(0.25);
+  const pivot = joint[bi("R_Shoulder")].clone();
+  // 손끝 너머로 조금 연장 (앞발 끝까지 광선이 닿게)
+  const tipDir = axis[axis.length - 1].clone().sub(axis[axis.length - 3]).normalize();
+  axis = [pivot, ...axis, axis[axis.length - 1].clone().addScaledVector(tipDir, 14)];
+  // 호 길이로 다시 나눔
+  const STEP = num("step", 2);
+  const cum = [0]; for (let k = 1; k < axis.length; k++) cum.push(cum[k - 1] + axis[k].distanceTo(axis[k - 1]));
+  const total = cum[cum.length - 1], NS = Math.ceil(total / STEP) + 1;
+  const C = [], T = [];
+  for (let i = 0; i < NS; i++) {
+    const L = Math.min(total, i * STEP); let k = 1; while (k < axis.length - 1 && cum[k] < L) k++;
+    const f = (L - cum[k - 1]) / (cum[k] - cum[k - 1] || 1);
+    C.push(axis[k - 1].clone().lerp(axis[k], f)); T.push(axis[k].clone().sub(axis[k - 1]).normalize());
+  }
+  for (let it = 0; it < 4; it++) for (let i = 1; i < NS - 1; i++) T[i] = T[i - 1].clone().add(T[i].clone().multiplyScalar(2)).add(T[i + 1]).normalize();
+  // 고리 기준 방향 (평행 이동으로 비틀림 없이): 처음 = 몸 바깥(−x) 을 축에 수직으로
+  const Uv = [], Vv = [];
+  let u = new THREE.Vector3(-1, 0, 0).addScaledVector(T[0], T[0].x).normalize();
+  for (let i = 0; i < NS; i++) { u.addScaledVector(T[i], -u.dot(T[i])).normalize(); Uv.push(u.clone()); Vv.push(T[i].clone().cross(u).normalize()); }
+  const M = num("dirs", 32);
+  const ray = new THREE.Ray(), hit = new THREE.Vector3();
+  const R0 = Array.from({ length: NS }, () => new Float32Array(M).fill(NaN));
+  for (let i = 0; i < NS; i++) for (let j = 0; j < M; j++) {
+    const th = (j / M) * Math.PI * 2, d = Uv[i].clone().multiplyScalar(Math.cos(th)).addScaledVector(Vv[i], Math.sin(th));
+    ray.set(C[i], d);
+    let far = NaN;
+    for (const [a, b, c] of armTris) if (ray.intersectTriangle(a, b, c, false, hit)) { const dd = hit.distanceTo(C[i]); if (dd < 45 && !(dd <= far)) far = dd; }
+    R0[i][j] = far;
+  }
+  // 빈 방향 메우기 (같은 고리에서 원형 보간) — 빈 게 너무 많은 고리(손끝 너머)는 끝으로 봄
+  let last = NS - 1;
+  for (let i = 0; i < NS; i++) { const ok = [...R0[i]].filter(Number.isFinite).length; if (i > NS / 2 && ok < M * 0.4) { last = i - 1; break; } }
+  const Rr = R0.slice(0, last + 1).map((row) => {
+    const r = Array.from(row); const ok = r.map(Number.isFinite);
+    if (!ok.some(Boolean)) return r.fill(10);
+    for (let j = 0; j < M; j++) if (!ok[j]) {
+      let a = 1; while (!ok[(j - a + M) % M]) a++; let b = 1; while (!ok[(j + b) % M]) b++;
+      r[j] = (r[(j - a + M) % M] * b + r[(j + b) % M] * a) / (a + b);
+    }
+    return r;
+  });
+  // 위팔(몸에 붙어 있던 쪽): 원본 겉면은 몸통 쪽으로 퍼져 있어 반지름이 비정상적으로 큰 방향이 있음 → 고리 중앙값의 1.35배로 자름
+  Rr.forEach((r) => { const med = r.slice().sort((a, b) => a - b)[M >> 1]; for (let j = 0; j < M; j++) r[j] = Math.min(r[j], med * num("rMax", 1.35)); });
+  // 위팔(어깨 → 팔이 몸에서 떨어지는 지점): 광선이 어깨 위 넓은 면까지 닿아 깃처럼 퍼짐 →
+  // 떨어지는 지점 고리 모양을 그대로 쓰고, 어깨 쪽으로 갈수록 조금(upperGrow) 굵게. 원본 겉면이 더 안쪽이면 그쪽
+  {
+    // 팔이 몸에서 확실히 떨어진 고리(떨어지는 지점에서 10cm 아래)를 단면 모양 본으로 → 어깨까지 매끈하게 굵어지고, 몸 속 끝은 둥글게 가늘어짐
+    const iFree = Math.min(last, Math.round(cum[1] / STEP) + 1);
+    const iT = Math.min(last, iFree + Math.round(num("tmplDown", 24) / STEP));
+    const tmpl = Rr[iT].slice(), grow = num("upperGrow", 1.18);
+    const sm = (x) => x * x * (3 - 2 * x);
+    for (let i = 0; i < iT; i++) {
+      const g = (iT - i) / iT; // 본 고리 0 → 회전 중심 1
+      const scale = (1 + (grow - 1) * sm(Math.min(1, g / 0.7))) * (g > 0.82 ? 1 - sm((g - 0.82) / 0.18) * 0.35 : 1);
+      for (let j = 0; j < M; j++) {
+        const th = (j / M) * Math.PI * 2, inner = Math.max(0, -Math.cos(th));
+        const want = tmpl[j] * scale * (1 + num("innerGrow", 0.18) * inner * sm(Math.min(1, g / 0.6)));
+        Rr[i][j] = inner > 0.3 ? want : Math.min(Rr[i][j], want);
+      }
+    }
+    log.push(`위팔 고리 ${iT}개: ${iT}번째 고리 모양으로 (굵기 ×${grow})`);
+  }
+  for (let it = 0; it < 3; it++) { const cp = Rr.map((r) => r.slice()); for (let i = 1; i < last; i++) for (let j = 0; j < M; j++) Rr[i][j] = (cp[i - 1][j] + 2 * cp[i][j] + cp[i + 1][j]) / 4; }
+  // 고리 사이·방향 사이 살짝 부드럽게
+  for (let it = 0; it < 2; it++) {
+    const cp = Rr.map((r) => r.slice());
+    for (let i = 0; i <= last; i++) for (let j = 0; j < M; j++) {
+      const n = [cp[i][(j + M - 1) % M], cp[i][(j + 1) % M], cp[Math.max(0, i - 1)][j], cp[Math.min(last, i + 1)][j]];
+      Rr[i][j] = (cp[i][j] * 4 + n.reduce((a, b) => a + b, 0)) / 8;
+    }
+  }
+  // ── 팔 = 위팔(몸에 붙어 있던 부분)만 로프트 + 팔꿈치 아래·앞발은 원본 메쉬 그대로 ──
+  // (전부 로프트로 만들면 앞발·손가락이 뭉개짐) — 자르는 고리 iCut 에서 로프트 고리와 원본 경계 고리를 지퍼처럼 이음
+  const iFree0 = Math.min(last, Math.round(cum[1] / STEP) + 1);
+  const iCut = Math.min(last - 2, iFree0 + Math.round(num("cutDown", 12) / STEP));
+  const LP = [], LF = [];
+  const ringStart = [];
+  for (let i = 0; i <= iCut; i++) {
+    ringStart.push(LP.length);
+    for (let j = 0; j < M; j++) {
+      const th = (j / M) * Math.PI * 2, d = Uv[i].clone().multiplyScalar(Math.cos(th)).addScaledVector(Vv[i], Math.sin(th));
+      LP.push(C[i].clone().addScaledVector(d, Rr[i][j]));
+    }
+  }
+  for (let i = 0; i < iCut; i++) for (let j = 0; j < M; j++) {
+    const a = ringStart[i] + j, b = ringStart[i] + ((j + 1) % M), c = ringStart[i + 1] + j, d = ringStart[i + 1] + ((j + 1) % M);
+    LF.push([a, c, d], [a, d, b]);
+  }
+  // 어깨 쪽 마개 (몸통 속)
+  {
+    const i = 0, dirSign = -1;
+    let prev = Array.from({ length: M }, (_, j) => ringStart[i] + j);
+    const c0 = C[i], t0 = T[i].clone().multiplyScalar(dirSign), meanR = Rr[i].reduce((x, y) => x + y, 0) / M;
+    for (let k = 1; k <= 4; k++) {
+      const ang = (k / 5) * Math.PI / 2, sc = Math.cos(ang), up = Math.sin(ang) * meanR * 0.8, cur = [];
+      for (let j = 0; j < M; j++) { cur.push(LP.length); LP.push(c0.clone().addScaledVector(LP[ringStart[i] + j].clone().sub(c0), sc).addScaledVector(t0, up)); }
+      for (let j = 0; j < M; j++) { const a = prev[j], b = prev[(j + 1) % M], c = cur[j], d = cur[(j + 1) % M]; LF.push([a, d, c], [a, b, d]); }
+      prev = cur;
+    }
+    const tip = LP.length; LP.push(c0.clone().addScaledVector(t0, meanR * 0.8));
+    for (let j = 0; j < M; j++) LF.push([prev[j], prev[(j + 1) % M], tip]);
+  }
+  {
+    const ladj = Array.from({ length: LP.length }, () => new Set());
+    for (const [x, y, z] of LF) { ladj[x].add(y).add(z); ladj[y].add(x).add(z); ladj[z].add(x).add(y); }
+    const cutRing = new Set(Array.from({ length: M }, (_, j) => ringStart[iCut] + j));
+    for (let it = 0; it < num("loftSmooth", 6); it++) for (const lam of [0.5, -0.53]) {
+      const D = LP.map((p, i) => { if (cutRing.has(i)) return null; const m = new THREE.Vector3(); ladj[i].forEach((u) => m.add(LP[u])); return m.divideScalar(ladj[i].size).sub(p); });
+      LP.forEach((p, i) => D[i] && p.addScaledVector(D[i], lam));
+    }
+  }
+  { const [a, b, c] = LF[0]; const nn = LP[b].clone().sub(LP[a]).cross(LP[c].clone().sub(LP[a])); const out = LP[a].clone().sub(C[0]); if (nn.dot(out) < 0) LF.forEach((f) => { const t = f[1]; f[1] = f[2]; f[2] = t; }); }
+  // 원본 앞쪽 조각: 자르는 평면 너머의 오른팔 면 (세 정점 모두)
+  const pc = C[iCut], pn = T[iCut];
+  const distal = (v) => V[v].clone().sub(pc).dot(pn) > 0;
+  const keepF = [];
+  F.forEach((f, t) => { if (faceSide[t] === "R" && f.every(distal)) keepF.push([...f, faceMat[t]]); });
+  // 경계 모서리 → 고리
+  const ecount = new Map();
+  for (const [a, b, c] of keepF) for (const [x, y] of [[a, b], [b, c], [c, a]]) { const k = x < y ? `${x},${y}` : `${y},${x}`; ecount.set(k, (ecount.get(k) || 0) + 1); }
+  const nxt = new Map();
+  for (const [a, b, c] of keepF) for (const [x, y] of [[a, b], [b, c], [c, a]]) { const k = x < y ? `${x},${y}` : `${y},${x}`; if (ecount.get(k) === 1) nxt.set(x, y); }
+  const loops = []; const usedL = new Set();
+  for (const st of nxt.keys()) { if (usedL.has(st)) continue; const L = []; let v = st; while (v !== undefined && !usedL.has(v)) { usedL.add(v); L.push(v); v = nxt.get(v); } loops.push(L); }
+  loops.sort((x, y) => y.length - x.length);
+  const bl = loops[0];
+  log.push(`원본 앞쪽 면 ${keepF.length} · 경계 고리 ${loops.map((l) => l.length).join(",")} (자르는 고리 ${iCut})`);
+  const omap = new Map();
+  const oid = (v) => { let id = omap.get(v); if (id === undefined) { id = LP.length; omap.set(v, id); LP.push(V[v].clone()); } return id; };
+  const origStart = LP.length;
+  for (const [a, b, c] of keepF) LF.push([oid(a), oid(b), oid(c), "orig"]);
+  // 지퍼: 고리 iCut (M 개, 각도 오름) ↔ 원본 경계 고리
+  const angOf = (q) => { const d = q.clone().sub(pc); return Math.atan2(d.dot(Vv[iCut]), d.dot(Uv[iCut])); };
+  const norm = (x) => ((x % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  let B = bl.map((v) => oid(v));
+  // 각도 증가 방향으로
+  let turn = 0; for (let k = 0; k < B.length; k++) { let d = angOf(LP[B[(k + 1) % B.length]]) - angOf(LP[B[k]]); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; turn += d; }
+  if (turn < 0) B.reverse();
+  let k0 = 0, mn = Infinity; B.forEach((v, k) => { const a2 = norm(angOf(LP[v])); if (a2 < mn) { mn = a2; k0 = k; } });
+  B = [...B.slice(k0), ...B.slice(0, k0)];
+  const angB = []; let prevA = norm(angOf(LP[B[0]]));
+  for (const v of B) { let a2 = norm(angOf(LP[v])); while (a2 < prevA - 1e-6) a2 += Math.PI * 2; angB.push(a2); prevA = a2; }
+  const RR = Array.from({ length: M }, (_, j) => ringStart[iCut] + j), angR = RR.map((_, j) => (j / M) * Math.PI * 2);
+  const nR = M, nB = B.length;
+  const RA = (i) => angR[i % nR] + (i >= nR ? Math.PI * 2 : 0), BA = (k) => (k < nB ? angB[k] : angB[k - nB] + Math.PI * 2);
+  // 시작 맞춤: 고리 R 의 0 각도와 B 의 첫 각도 차이만큼 R 을 돌림
+  let r0 = 0; while (r0 < nR - 1 && angR[r0 + 1] <= angB[0]) r0++;
+  const bridge = [];
+  let ia = 0, ib = 0;
+  while (ia < nR || ib < nB) {
+    const ra = RA(r0 + ia), rb = RA(r0 + ia + 1), ba = BA(ib + 1);
+    const vR = RR[(r0 + ia) % nR], vR2 = RR[(r0 + ia + 1) % nR], vB = B[ib % nB], vB2 = B[(ib + 1) % nB];
+    if (ib >= nB || (ia < nR && rb <= ba)) { bridge.push([vR, vR2, vB]); ia++; }
+    else { bridge.push([vR, vB2, vB]); ib++; }
+  }
+  for (const t of bridge) {
+    const [a, b2, c] = t; const nn = LP[b2].clone().sub(LP[a]).cross(LP[c].clone().sub(LP[a]));
+    const ctr2 = LP[a].clone().add(LP[b2]).add(LP[c]).divideScalar(3), out = ctr2.clone().sub(pc); out.addScaledVector(pn, -out.dot(pn));
+    LF.push(nn.dot(out) >= 0 ? [a, b2, c] : [a, c, b2]);
+  }
+  // 이음매만 살짝 다듬기 (자르는 고리 · 원본 경계)
+  {
+    const sel = new Set([...RR, ...B]);
+    const ladj = new Map(); const add = (x, y) => (ladj.get(x) ?? ladj.set(x, new Set()).get(x)).add(y);
+    for (const f of LF) { const [x, y, z] = f; add(x, y); add(x, z); add(y, x); add(y, z); add(z, x); add(z, y); }
+    for (let it = 0; it < 4; it++) for (const lam of [0.5, -0.53]) {
+      const D = new Map(); for (const v of sel) { const m = new THREE.Vector3(); ladj.get(v).forEach((u) => m.add(LP[u])); D.set(v, m.divideScalar(ladj.get(v).size).sub(LP[v])); }
+      for (const [v, d] of D) LP[v].addScaledVector(d, lam);
+    }
+  }
+  log.push(`이음: 지퍼 면 ${bridge.length}`);
+  log.push(`팔: 로프트 고리 ${iCut + 1}개 + 원본 앞쪽 · 정점 ${LP.length} · 면 ${LF.length}`);
+  window.__ringProfile = Rr.map((r, i) => [i, +(r.reduce((x, y) => x + y, 0) / M).toFixed(1), +Math.max(...r).toFixed(1), +Math.min(...r).toFixed(1), +[...R0[i]].filter(Number.isFinite).length]);
+  for (const side of ["R", "L"]) {
+    const base = P.length;
+    for (const p of LP) {
+      const pp = side === "R" ? p.clone() : new THREE.Vector3(-p.x, p.y, p.z);
+      P.push(pp);
+      const qq = p;
+      const sI = segInfo(qq), along = sI.s + sI.t;
+      const k0 = Math.min(4, Math.floor(along)), f = along - Math.floor(along);
+      const BW = num("jointBlend", 0.4); const blend = f < BW && k0 > 0 ? (BW - f) / (2 * BW) : f > 1 - BW && k0 < 4 ? (f - (1 - BW)) / (2 * BW) : 0;
+      const other = Math.max(0, Math.min(4, f < 0.5 ? k0 - 1 : k0 + 1));
+      const m = new Map();
+      if (qq.distanceTo(joint[bi("R_Thumb")]) < 9 && along > 3.6) m.set(side + "_Thumb", 1);
+      else { m.set(side + "_" + chainNames[k0].slice(2), 1 - blend); if (blend > 0) m.set(side + "_" + chainNames[other].slice(2), (m.get(side + "_" + chainNames[other].slice(2)) || 0) + blend); }
+      Wt.push(m);
+    }
+    for (const [a, b, c] of LF) outF.push(side === "R" ? [base + a, base + b, base + c, 1] : [base + a, base + c, base + b, 1]);
+  }
+}
+
+// ── 뼈대 (오른팔 + 거울 왼팔) ──
+const allNames = [...names], allJoint = joint.map((v) => v.clone()), allParent = [...parent];
+const rIdx = names.map((nm, i) => (nm.startsWith("R_") ? i : -1)).filter((i) => i >= 0);
+const lOf = new Map();
+for (const i of rIdx) { lOf.set(i, allNames.length); allNames.push("L_" + names[i].slice(2)); allJoint.push(new THREE.Vector3(-joint[i].x, joint[i].y, joint[i].z)); allParent.push(-2); }
+for (const i of rIdx) allParent[lOf.get(i)] = lOf.has(parent[i]) ? lOf.get(parent[i]) : parent[i];
+const bones = allNames.map((nm) => { const b = new THREE.Bone(); b.name = nm; return b; });
+allNames.forEach((_, i) => { const p = allParent[i]; if (p >= 0) { bones[p].add(bones[i]); bones[i].position.copy(allJoint[i]).sub(allJoint[p]); } else bones[i].position.copy(allJoint[i]); });
+// ── 어깨 살: 몸통 중 어깨 회전 중심 가까운 곳은 팔 회전을 일부(가까울수록 많이) 따라감 ──
+// 팔만 돌고 몸통이 가만있으면 인형 팔 끼운 것처럼 보임 → 어깨가 같이 들리고 겨드랑이가 생기게.
+// 분수 회전은 보조 본(어깨 회전의 k/K 를 slerp)으로 — 선형 혼합이면 납작해짐
+const HK = 8;
+for (const side of ["R", "L"]) {
+  const sh = allNames.indexOf(side + "_Shoulder");
+  for (let k = 1; k < HK; k++) {
+    const hb = new THREE.Bone(); hb.name = `${side}_ShoulderPart${k}`;
+    hb.position.copy(bones[sh].position); bones[allParent[sh]].add(hb);
+    hb.userData.follow = { bone: sh, frac: k / HK };
+    bones.push(hb); allNames.push(hb.name); allParent.push(allParent[sh]); allJoint.push(allJoint[sh].clone());
+  }
+}
+{
+  const R0 = num("shR0", 10), R1 = num("shR1", 36), FMAX = num("shMax", 0.6);
+  let cnt = 0;
+  for (let v = 0; v < P.length; v++) {
+    const m = Wt[v]; if (!m || !m.has("BodyHold")) continue;
+    if ([...m.keys()].some((k) => k.startsWith("R_") || k.startsWith("L_"))) continue;
+    const side = P[v].x < 0 ? "R" : "L";
+    if (Math.abs(P[v].x) < num("shX", 25)) continue;
+    const pv = allJoint[allNames.indexOf(side + "_Shoulder")];
+    const d = P[v].distanceTo(pv);
+    const t = Math.min(1, Math.max(0, (d - R0) / (R1 - R0))), f = FMAX * (1 - t * t * (3 - 2 * t));
+    if (f < 0.01) continue;
+    const bw = m.get("BodyHold"); m.delete("BodyHold");
+    const x = f * HK, k0 = Math.floor(x), tt = x - k0;
+    const nameAt = (k) => (k <= 0 ? "BodyHold" : k >= HK ? side + "_Shoulder" : `${side}_ShoulderPart${k}`);
+    m.set(nameAt(k0), (m.get(nameAt(k0)) || 0) + bw * (1 - tt));
+    if (tt > 1e-4) m.set(nameAt(k0 + 1), (m.get(nameAt(k0 + 1)) || 0) + bw * tt);
+    cnt++;
+  }
+  log.push(`어깨 살 따라가기: 정점 ${cnt} (반경 ${R0}~${R1}cm, 최대 ${FMAX})`);
+}
+const syncHelpers = () => bones.forEach((b) => { const f = b.userData.follow; if (f) b.quaternion.identity().slerp(bones[f.bone].quaternion, f.frac); });
+
+
+// ── 지오메트리 (재질별 그룹) ──
+const NP = P.length;
+const posA = new Float32Array(NP * 3), SI = new Uint16Array(NP * 4), SW = new Float32Array(NP * 4);
+P.forEach((p, i) => p.toArray(posA, i * 3));
+for (let i = 0; i < NP; i++) {
+  const m = Wt[i] ?? new Map([["BodyHold", 1]]);
+  const top = [...m].filter(([, x]) => x > 0).sort((a, b) => b[1] - a[1]).slice(0, 4), s = top.reduce((a, x) => a + x[1], 0) || 1;
+  for (let k = 0; k < 4; k++) { SI[i * 4 + k] = top[k] ? Math.max(0, allNames.indexOf(top[k][0])) : 0; SW[i * 4 + k] = top[k] ? top[k][1] / s : 0; }
+}
+const byMat = [[], []];
+for (const [a, b, c, m] of outF) byMat[m].push(a, b, c);
+const geo = new THREE.BufferGeometry();
+geo.setAttribute("position", new THREE.BufferAttribute(posA, 3));
+geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(SI, 4));
+geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(SW, 4));
+geo.setIndex([...byMat[0], ...byMat[1]]);
+geo.addGroup(0, byMat[0].length, 0);
+geo.addGroup(byMat[0].length, byMat[1].length, 1);
+geo.computeVertexNormals();
+log.push(`결과: 정점 ${NP} · 면 ${outF.length}`);
+const mFace = new THREE.MeshStandardMaterial({ name: "face", color: 0x151515, roughness: 0.35 });
+const mBody = new THREE.MeshStandardMaterial({ name: "body", color: 0xf4f4f4, roughness: 0.75 });
+const mesh = new THREE.SkinnedMesh(geo, [mFace, mBody]);
+mesh.name = "Puuvilla_Seat_A";
+const root = new THREE.Group(); root.name = "Puuvilla_Seat_A_rig";
+root.add(...bones.filter((_, i) => allParent[i] < 0), mesh);
+root.updateMatrixWorld(true);
+mesh.bind(new THREE.Skeleton(bones));
+
+// ── 확인 렌더 ──
+const CW = 420, CH = 460;
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+R.setSize(CW, CH); R.toneMapping = THREE.NeutralToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe8573a);
+scene.environment = new THREE.PMREMGenerator(R).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.6;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777777, 1.3));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(2, 3, 4); scene.add(key);
+scene.add(root);
+const cam = new THREE.PerspectiveCamera(26, CW / CH, 1, 10000);
+const colA = new Float32Array(NP * 3), cc = new THREE.Color();
+for (let i = 0; i < NP; i++) { const nm = allNames[SI[i * 4]]; cc.setHex(nm.startsWith("R_") ? 0x43a047 : nm.startsWith("L_") ? 0x8e44ad : nm === "Head" ? 0x3f6fff : nm === "Neck" ? 0x26c6da : 0xf2f2f2); if (i >= NV + armCopy.R.size + armCopy.L.size && !nm.includes("_")) cc.lerp(new THREE.Color(0xffd54f), 0.6); colA.set([cc.r, cc.g, cc.b], i * 3); }
+const wMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
+const shots = [];
+const ctr = new THREE.Vector3(0, 150, 20);
+const B = (nm) => bones[allNames.indexOf(nm)];
+const reset = () => bones.forEach((b) => b.quaternion.identity());
+const shot = (label, az, weights, el = 0.06, dist = 900, focus = null) => {
+  mesh.material = weights ? wMat : [mFace, mBody];
+  if (weights) geo.setAttribute("color", new THREE.BufferAttribute(colA, 3));
+  const cc = focus ? new THREE.Vector3(...focus) : ctr;
+  cam.position.set(cc.x + dist * Math.sin(az) * Math.cos(el), cc.y + (focus ? 0 : 60) + dist * Math.sin(el), cc.z + dist * Math.cos(az) * Math.cos(el)); cam.lookAt(cc);
+  syncHelpers(); root.updateMatrixWorld(true); R.render(scene, cam);
+  const cv = document.createElement("canvas"); cv.width = CW; cv.height = CH + 24;
+  const g = cv.getContext("2d"); g.fillStyle = "#222"; g.fillRect(0, 0, CW, 24); g.drawImage(R.domElement, 0, 24);
+  g.fillStyle = "#fff"; g.font = "14px sans-serif"; g.fillText(label, 8, 17);
+  shots.push(cv);
+};
+const aim = (side, dir, bend = 0) => {
+  const j0 = allJoint[allNames.indexOf(side + "_Shoulder")], j1 = allJoint[allNames.indexOf(side + "_Hand")];
+  B(side + "_Shoulder").quaternion.setFromUnitVectors(j1.clone().sub(j0).normalize(), new THREE.Vector3(...dir).normalize());
+  if (bend) B(side + "_Elbow").quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -bend);
+};
+reset();
+const origMesh = new THREE.Mesh(src, [mFace, mBody]); scene.add(origMesh); origMesh.visible = false;
+const shotOrig = (label, az) => { root.visible = false; origMesh.visible = true; shot(label, az, false); root.visible = true; origMesh.visible = false; };
+shotOrig("원본 · 정면", 0);
+shot("새 팔 · 정면", 0, false);
+shotOrig("원본 · 3/4", 0.8);
+shot("새 팔 · 3/4", 0.8, false);
+const wave = (side, phase) => {
+  // 인사: 팔을 옆·위로 들고 팔꿈치 굽힘, 아래팔을 좌우로 흔듦
+  const sg = side === "R" ? -1 : 1;
+  aim(side, [sg * 0.85, 0.45, 0.3]);
+  const el = B(side + "_Elbow"); el.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), sg * (1.15 + phase * 0.3));
+};
+reset(); wave("L", -1); B("Head").rotation.set(0.05, 0.25, 0.1);
+shot("인사 1", 0, false);
+reset(); wave("L", 1); B("Head").rotation.set(0.05, 0.25, 0.1);
+shot("인사 2", 0, false);
+reset(); wave("L", 0);
+shot("인사 · 3/4", 0.7, false);
+reset(); wave("L", 0);
+shot("인사 · 반대쪽 3/4", -0.7, false);
+reset(); aim("R", [-0.35, 1, 0.1]); aim("L", [0.35, 1, 0.1]);
+shot("만세", 0, false);
+reset(); wave("L", 0.5); B("Head").rotation.set(0.05, 0.25, 0.1);
+shot("인사 · 가까이", 0.2, false, 0.05, 520, [60, 190, 0]);
+shot("인사 · 가까이 3/4", 0.9, false, 0.05, 520, [60, 190, 0]);
+reset(); aim("R", [-1, 0.05, 0.15]); aim("L", [1, 0.05, 0.15]);
+shot("양팔 옆으로", 0, false);
+reset();
+geo.deleteAttribute("color");
+mesh.material = [mFace, mBody];
+const sheet = document.createElement("canvas"); sheet.width = CW * 4; sheet.height = (CH + 24) * Math.ceil(shots.length / 4);
+const sg = sheet.getContext("2d");
+shots.forEach((s, i) => sg.drawImage(s, (i % 4) * CW, Math.floor(i / 4) * (CH + 24)));
+document.body.appendChild(sheet); sheet.style.width = "100%";
+window.__sheet = sheet.toDataURL("image/png");
+// ── 앱용 파일 (public/models/seat.bin) ──
+// 기존 앱 좌표(pu_stand cm)에 맞춤: 눈 두 개 중심·간격을 pu_stand 눈에 맞추는 배율·이동 (build-sit 과 같은 방식)
+// 내용: 뼈대(이름·부모·관절 위치·보조 본 분수) · 몸(정점·면·스킨 4개) · 얼굴 부품(눈 L/R · 코 · 입선 — 검은 재질 면의 연결 덩어리)
+// 앱 좌표 변환: 눈 두 개 중심·간격을 pu_stand 눈에 맞춤 (exportSeat 와 exportParts 가 같이 씀)
+async function appTransform() {
+  const black = outF.filter((f) => f[3] === 0);
+  const par = new Map(); const find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+  for (const [a, b, c] of black) for (const v of [a, b, c]) if (!par.has(v)) par.set(v, v);
+  for (const [a, b, c] of black) { par.set(find(b), find(a)); par.set(find(c), find(a)); }
+  const comps = new Map();
+  for (const f of black) { const r = find(f[0]); (comps.get(r) ?? comps.set(r, []).get(r)).push(f); }
+  const parts = [...comps.values()].map((tris) => { const b = new THREE.Box3(); tris.forEach((t) => t.slice(0, 3).forEach((v) => b.expandByPoint(P[v]))); return { tris, b, c: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) }; })
+    .sort((a, b) => b.tris.length - a.tris.length).slice(0, 4);
+  const mouth = parts.reduce((a, b) => (b.size.y / b.size.x < a.size.y / a.size.x ? b : a));
+  const rest = parts.filter((q) => q !== mouth);
+  const nose = rest.reduce((a, b) => (b.tris.length > a.tris.length ? b : a));
+  const eyes = rest.filter((q) => q !== nose).sort((a, b) => a.c.x - b.c.x);
+  const objText = await (await fetch("/models/pu_stand.obj")).text();
+  const oldV = [], oldParts = {}; let cur = null;
+  for (const line of objText.split(/\r?\n/)) { const q = line.trim().split(/\s+/); if (q[0] === "v") oldV.push([+q[1], +q[2], +q[3]]); else if (q[0] === "o" || q[0] === "g") cur = q[1]; else if (q[0] === "f" && cur) (oldParts[cur] ??= new Set()).add(...q.slice(1).map((t) => +t.split("/")[0] - 1)); }
+  const oldEyes = Object.values(oldParts).map((set) => { const b = new THREE.Box3(); for (const i of set) b.expandByPoint(new THREE.Vector3(...oldV[i])); return b; })
+    .filter((b) => { const z = b.getSize(new THREE.Vector3()); return z.x < 6 && z.y < 6 && b.getCenter(new THREE.Vector3()).y > 140; }).map((b) => b.getCenter(new THREE.Vector3())).sort((a, b) => a.x - b.x);
+  const sc = oldEyes[1].distanceTo(oldEyes[0]) / eyes[1].c.distanceTo(eyes[0].c);
+  const newMid = eyes[0].c.clone().add(eyes[1].c).multiplyScalar(0.5), oldMid = oldEyes[0].clone().add(oldEyes[1]).multiplyScalar(0.5);
+  return { sc, T: (v) => v.clone().sub(newMid).multiplyScalar(sc).add(oldMid) };
+}
+// 팔 만들기 입력 (scripts/seat/arm_sweep.py): 몸통(팔 떼고 구멍 메운 것) · 오른팔/왼팔 껍질(원본 면, 열린 채) 을 앱 좌표 glb 로
+async function exportParts() {
+  const { sc, T } = await appTransform();
+  const grp = new THREE.Group();
+  const armIds = { R: new Set(armCopy.R.values()), L: new Set(armCopy.L.values()) };
+  const mk = (name, faces) => {
+    const ids = new Map(), pos = [];
+    const idx = faces.flatMap((f) => f.slice(0, 3).map((v) => { let i = ids.get(v); if (i === undefined) { i = ids.size; ids.set(v, i); pos.push(...T(P[v]).toArray()); } return i; }));
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mBody); m.name = name; return m;
+  };
+  grp.add(mk("torso", outF.filter((f) => !armIds.R.has(f[0]) && !armIds.L.has(f[0]))), mk("armR", outF.filter((f) => armIds.R.has(f[0]))), mk("armL", outF.filter((f) => armIds.L.has(f[0]))));
+  // 구멍 메운 면(채움)만 따로 — 팔 껍질을 닫는 뚜껑으로 씀 (arm_mirror.py). 채움 정점은 팔 복제 정점 뒤에 붙어 있음
+  const fillFrom = NV + armCopy.R.size + armCopy.L.size;
+  const fillF = outF.filter((f) => f.slice(0, 3).some((v) => v >= fillFrom));
+  const cx = (f) => (P[f[0]].x + P[f[1]].x + P[f[2]].x) / 3;
+  grp.add(mk("fillR", fillF.filter((f) => cx(f) < 0)), mk("fillL", fillF.filter((f) => cx(f) > 0)));
+  const glb = await new GLTFExporter().parseAsync(grp, { binary: true });
+  const r = await fetch("/__mimic/save-model?name=parts_seat.glb", { method: "POST", body: glb });
+  log.push(`parts_seat.glb ${(glb.byteLength / 1024).toFixed(0)}KB (배율 ${sc.toFixed(4)}) ${r.ok ? "저장됨" : "저장 실패"}`);
+}
+if (QS.has("exportParts")) await exportParts();
+async function exportSeat() {
+  // 검은 면 연결 덩어리
+  const black = outF.filter((f) => f[3] === 0);
+  const par = new Map(); const find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+  for (const [a, b, c] of black) for (const v of [a, b, c]) if (!par.has(v)) par.set(v, v);
+  for (const [a, b, c] of black) { par.set(find(b), find(a)); par.set(find(c), find(a)); }
+  const comps = new Map();
+  for (const f of black) { const r = find(f[0]); (comps.get(r) ?? comps.set(r, []).get(r)).push(f); }
+  const parts = [...comps.values()].map((tris) => { const b = new THREE.Box3(); tris.forEach((t) => t.slice(0, 3).forEach((v) => b.expandByPoint(P[v]))); return { tris, b, c: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) }; })
+    .sort((a, b) => b.tris.length - a.tris.length).slice(0, 4);
+  const mouth = parts.reduce((a, b) => (b.size.y / b.size.x < a.size.y / a.size.x ? b : a));
+  const rest = parts.filter((q) => q !== mouth);
+  const nose = rest.reduce((a, b) => (b.tris.length > a.tris.length ? b : a));
+  const eyes = rest.filter((q) => q !== nose).sort((a, b) => a.c.x - b.c.x);
+  // pu_stand 눈
+  const objText = await (await fetch("/models/pu_stand.obj")).text();
+  const oldV = [], oldParts = {}; let cur = null;
+  for (const line of objText.split(/\r?\n/)) { const q = line.trim().split(/\s+/); if (q[0] === "v") oldV.push([+q[1], +q[2], +q[3]]); else if (q[0] === "o" || q[0] === "g") cur = q[1]; else if (q[0] === "f" && cur) (oldParts[cur] ??= new Set()).add(...q.slice(1).map((t) => +t.split("/")[0] - 1)); }
+  const oldEyes = Object.values(oldParts).map((set) => { const b = new THREE.Box3(); for (const i of set) b.expandByPoint(new THREE.Vector3(...oldV[i])); return b; })
+    .filter((b) => { const z = b.getSize(new THREE.Vector3()); return z.x < 6 && z.y < 6 && b.getCenter(new THREE.Vector3()).y > 140; }).map((b) => b.getCenter(new THREE.Vector3())).sort((a, b) => a.x - b.x);
+  const sc = oldEyes[1].distanceTo(oldEyes[0]) / eyes[1].c.distanceTo(eyes[0].c);
+  const newMid = eyes[0].c.clone().add(eyes[1].c).multiplyScalar(0.5), oldMid = oldEyes[0].clone().add(oldEyes[1]).multiplyScalar(0.5);
+  const T = (v) => v.clone().sub(newMid).multiplyScalar(sc).add(oldMid);
+  log.push(`앱 좌표: 배율 ${sc.toFixed(4)} · 눈 중간 ${newMid.toArray().map((x) => x.toFixed(0))} → ${oldMid.toArray().map((x) => x.toFixed(1))}`);
+  // 몸 = 모든 면 (검은 눈·코·입 자리 포함 — 빼면 구멍이 뚫려 작게 그린 눈알 둘레로 배경이 보임). 정점 다시 번호
+  const bodyF = outF;
+  const remap = new Map(), bp = [], bi4 = [], bw4 = [];
+  for (const f of bodyF) for (const v of f.slice(0, 3)) if (!remap.has(v)) { remap.set(v, remap.size); bp.push(...T(P[v]).toArray()); for (let k = 0; k < 4; k++) { bi4.push(SI[v * 4 + k]); bw4.push(SW[v * 4 + k]); } }
+  const bIdx = bodyF.flatMap((f) => f.slice(0, 3).map((v) => remap.get(v)));
+  // 눈·코·입 부품은 몸 표면에서 법선 쪽으로 조금 띄움 (몸이 같은 자리를 덮고 있어서 — 안 띄우면 털이 덮어 코가 하얗게 보임)
+  const LIFT = num("partLift", 0.45);
+  const partOut = (pt) => {
+    const nrm = new Map();
+    for (const t of pt.tris) { const [a, b, c] = t.slice(0, 3); const nn = P[b].clone().sub(P[a]).cross(P[c].clone().sub(P[a])); for (const v of [a, b, c]) nrm.set(v, (nrm.get(v) ?? new THREE.Vector3()).add(nn)); }
+    const m = new Map(), pp = [];
+    for (const t of pt.tris) for (const v of t.slice(0, 3)) if (!m.has(v)) { m.set(v, m.size); pp.push(...T(P[v]).addScaledVector(nrm.get(v).normalize(), LIFT).toArray()); }
+    return { pos: pp, idx: pt.tris.flatMap((t) => t.slice(0, 3).map((v) => m.get(v))) };
+  };
+  // 캐릭터 기준: 눈 x 가 + 쪽이 캐릭터 왼눈(L) — 앱 관례(eyeL = center.x > 0)
+  const faceParts = { eyeR: partOut(eyes[0]), eyeL: partOut(eyes[1]), nose: partOut(nose), mouth: partOut(mouth) };
+  const boneInfo = allNames.map((nm, i) => ({ name: nm, parent: allParent[i], pos: T(allJoint[i]).toArray().map((x) => +x.toFixed(4)), follow: bones[i].userData.follow ? { bone: bones[i].userData.follow.bone, frac: bones[i].userData.follow.frac } : undefined }));
+  const header = { version: 1, scale: sc, bones: boneInfo, body: { verts: bp.length / 3, tris: bIdx.length / 3 }, parts: Object.fromEntries(Object.entries(faceParts).map(([k, v]) => [k, { verts: v.pos.length / 3, tris: v.idx.length / 3 }])) };
+  const enc = new TextEncoder().encode(JSON.stringify(header));
+  const pad4 = (n) => (n + 3) & ~3;
+  const chunks = [new Float32Array(bp), new Uint32Array(bIdx), new Uint16Array(bi4), new Float32Array(bw4)];
+  for (const k of ["eyeL", "eyeR", "nose", "mouth"]) chunks.push(new Float32Array(faceParts[k].pos), new Uint32Array(faceParts[k].idx));
+  let size = 4 + pad4(enc.length); for (const c of chunks) size += pad4(c.byteLength);
+  const buf = new ArrayBuffer(size), dv = new DataView(buf); dv.setUint32(0, enc.length, true); new Uint8Array(buf, 4, enc.length).set(enc);
+  let off = 4 + pad4(enc.length);
+  for (const c of chunks) { new Uint8Array(buf, off, c.byteLength).set(new Uint8Array(c.buffer, c.byteOffset, c.byteLength)); off += pad4(c.byteLength); }
+  const r = await fetch("/__mimic/save-model?name=seat.bin", { method: "POST", body: buf });
+  log.push(`seat.bin ${(buf.byteLength / 1024).toFixed(0)}KB · 몸 ${header.body.verts}정점 · 부품 ${JSON.stringify(header.parts)} ${r.ok ? "저장됨" : "저장 실패"}`);
+}
+if (QS.has("ref")) {
+  // 3D 생성기(Hunyuan3D-2mv) 입력: 몸통(구멍 메움) + 원본 팔 조각(열린 껍질, 양면) 을 T포즈로, 앞/왼/뒤/오른 4방향, 투명 배경
+  mBody.side = THREE.DoubleSide; mFace.side = THREE.DoubleSide;
+  mesh.material = [mFace, mBody];
+  const RW = Number(QS.get("refSize") || 1024);
+  const R2 = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+  R2.setSize(RW, RW); R2.toneMapping = THREE.NeutralToneMapping; R2.setClearColor(0x000000, 0);
+  const sc2 = new THREE.Scene(); sc2.environment = scene.environment; sc2.environmentIntensity = 0.5;
+  sc2.add(new THREE.HemisphereLight(0xffffff, 0x999999, 1.2));
+  const k2 = new THREE.DirectionalLight(0xffffff, 1.2); k2.position.set(1, 3, 4); sc2.add(k2);
+  const f2 = new THREE.DirectionalLight(0xffffff, 0.5); f2.position.set(-2, 1, -3); sc2.add(f2);
+  sc2.add(root);
+  reset();
+  const tArm = Number(QS.get("refArm") || 0.12);   // 팔 방향: 수평에서 위로 (rad). 0 = 수평
+  aim("R", [-1, Math.sin(tArm), 0]); aim("L", [1, Math.sin(tArm), 0]);
+  syncHelpers(); root.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(mesh); const c3 = bb.getCenter(new THREE.Vector3()), sz3 = bb.getSize(new THREE.Vector3());
+  const cam2 = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 5000);
+  const half = Math.max(sz3.x, sz3.y) * 0.5 * 1.12;
+  cam2.left = -half; cam2.right = half; cam2.top = half; cam2.bottom = -half; cam2.updateProjectionMatrix();
+  const views = { front: 0, left: Math.PI / 2, back: Math.PI, right: -Math.PI / 2 };
+  for (const [name, az] of Object.entries(views)) {
+    cam2.position.set(c3.x + 2000 * Math.sin(az), c3.y, c3.z + 2000 * Math.cos(az)); cam2.lookAt(c3); cam2.updateProjectionMatrix();
+    R2.render(sc2, cam2);
+    await fetch("/__mimic/trace", { method: "POST", body: `IMG ref_${name} ` + R2.domElement.toDataURL("image/png") });
+  }
+  log.push(`참고 렌더 4장 저장 (${RW}px, 팔 ${tArm}rad)`);
+}
+if (QS.has("save")) {
+  await exportSeat();
+  mBody.side = THREE.FrontSide;
+  const glb = await new GLTFExporter().parseAsync(root, { binary: true, onlyVisible: false });
+  const r = await fetch("/__mimic/save-model?name=seat_a.glb", { method: "POST", body: glb });
+  log.push(`glb ${(glb.byteLength / 1024).toFixed(0)}KB → public/models/seat_a.glb ${r.ok ? "저장됨" : "저장 실패"}`);
+}
+document.getElementById("i").textContent = log.join("\n");
+window.__dbg = { THREE, P, outF, NV, armCopy, scene, root, R, cam, V, loopsR, F, faceSide };
+window.__log = log; window.__ready = true;
+</script></body></html>
