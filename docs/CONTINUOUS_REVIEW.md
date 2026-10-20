@@ -392,3 +392,17 @@
 - 검증: 전체 rig:check, typecheck, probe-bend-spread .45, 배포 빌드 통과. 기존 분기와 신규 분기에서 같은 rigid-paw/몸통 보존을 별도로 확인했다. 전용 **codex-20261020-094057** 배포, 외부 config(.45/머리 충돌false/손 충돌false/몸통 보호true), 실제 유화 렌더와 console error0 확인. 원래 공개 current.txt=20261020-004619 유지. 이전 빌드는 모두 보존했다.
 - 증거: docs/arm-review/codex-v29-bend-detail.jpg(왼쪽 .32/오른쪽 .45, 정면·사선8초), codex-v29-bend-comparison.jpg, codex-v29-bend-*-sequence.jpg/webm, codex-v29-bend-metrics.json, codex-v29-checks.txt.
 - 다음 실험: 굽힘 폭을 더 늘리거나 손을 키우지 말고, 부분 웨이트→완전 팔 영역 전환에서 남는 겨드랑이/위팔 움푹함을 실제 연결 edge와 단면에서 계측한다. 부분 웨이트 구역의 DQS와 둥근 중심선이 서로 다른 위치를 주는지 조사하고 원래 몸통 앵커·원본 단면을 보존하는 후보만 검토한다. 손 가림에서 랜드마크 면이 반전되는 경우는 여전히 별도 검증이 필요하다.
+
+## 사용자 승인: v29 공개본 승격 (2026-10-20)
+
+- 사용자가 “이 버전 우선 공개버전에 업데이트하고 개발용에서 계속 개발”을 명시 요청했다. 기존 공개 폴더 읽기 전용 원칙의 이번 승격만 예외이며 AGENTS.md에 기록했다. 이후 개발/배포는 계속 Codex 전용이고 공개본 자동 갱신 권한으로 확대하지 않는다.
+- 검토된 codex-20261020-094057 빌드를 그대로 C:/SSG_Christmas/pubilla-mimic-hosting/codex-promoted-20261020-094057 에 별도 복사했다. 62파일 SHA256/파일수 일치 확인 후 current.txt만 원자적으로 교체했다. 소스 재빌드나 새 실험을 섞지 않았다. Claude 소스 및 preview.txt 미수정.
+- 공개 https://nau-gyuchan.tailc22fe0.ts.net/ 의 config build=codex-20261020-094057, 팔 활성/미러 웨이트/.45 굽힘 설정, index-C9rLJcVr.js, HTTP200, 실제 유화 인사 렌더/console error0 확인. 공개 검증 캡처 codex-v29-public-promotion.png. 카메라 자체는 켜지 않았다.
+- 복구: 원래 빌드20261020-004619 그대로 보존, 공개 호스팅의 current.before-codex-v29.txt에 이전 포인터 저장. 필요 시 이 파일의 내용을 current.txt로 복원하면 된다. current.bak.txt와 preview.txt는 손대지 않았다.
+- 개발 https://nau-gyuchan.tailc22fe0.ts.net:10000/ 는 기존 Codex 호스팅을 계속 사용한다. 공개와 폴더/포인터가 별개라 개발 업데이트는 공개에 전파되지 않는다.
+
+## v30 조사 시작: 부분 웨이트 전환부
+
+- 공개 승격 후 개발용에서 probe-arm-transition.mjs를 추가했다. v29 rounded 결과와 DQS만 적용한 결과의 부분 웨이트 경계42개 edge를 비교한다. 굽힘4×회전3의 합성 재현 결과는 codex-v30-transition-diagnostic.json에 보존한다.
+- 깊은 굽힘2.4에서 edge767–769는 원본 길이 대비 DQS1.095배, 현재 rounded 전환1.304배로 늘어났다. 회전값0/1.5/2.5에서 같아 이 경계의 늘어남은 손바닥 twist와 별개일 가능성이 있다. 다만 하나의 제한된 영역/합성 입력이고 실제 겨드랑이 시각 결함의 원인으로 확정한 것은 아니다.
+- 다음은 해당 정점의 위치와 주변 면을 렌더에 표시하고, 두 변형의 전환을 수정한 후보를 같은 세 방향 동작으로 검증한다. 이번 조사로 공개/개발용 런타임을 추가 변경하지 않았다. 팔 형태가 완성됐다는 의미가 아니다.

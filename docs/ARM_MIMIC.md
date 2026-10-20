@@ -134,3 +134,9 @@
 - 회전 시작점을 .15로 넓힌 별도 후보는 깊은 굽힘 압축 퇴행 때문에 거절했다. 기본 rollStart=.30과 기존 twist 분포 유지.
 - 실제 전후 얼굴 접근16초/유화 인사12초를 정면·사선·측면에서 기록/프레임 대조했다. 팔꿈치 안쪽의 급한 꺾임은 완화되었으나 손의 평면감과 겨드랑이 눌림은 미해결이다. 합성15조합 및 기존 전체 리그/타입 검사 통과. 실카메라 합격을 의미하지 않는다.
 - 다음은 부분 웨이트 DQS→완전 팔 둥근 굽힘 전환부의 위치/단면 불일치를 조사한다. 상세 증거와 배제한 실험은 CONTINUOUS_REVIEW.md v29에 기록했다.
+
+## v29 공개본 반영 / 개발 분리
+
+- 사용자 명시 승인으로 v29를 공개 https://nau-gyuchan.tailc22fe0.ts.net/ 에 반영했다. 공개 current.txt=codex-promoted-20261020-094057, 실제 config.build=codex-20261020-094057. 원본 빌드와 current.before-codex-v29.txt 복구 포인터 보존.
+- 이후 개발은 계속 https://nau-gyuchan.tailc22fe0.ts.net:10000/ 및 pubilla-mimic-codex 에서 진행한다. 별도 승인 없이 추가 개발 결과를 공개로 자동 승격하지 않는다.
+- v30 시작: 부분 웨이트 경계42개 edge에서 DQS/rounded 전환 길이 차이를 계측했다. 깊은 굽힘의 특정 edge에서1.095배→1.304배 차이가 발견돼 주변 면의 실제 렌더 대조가 다음 단계다. probe-arm-transition.mjs / codex-v30-transition-diagnostic.json 참조.

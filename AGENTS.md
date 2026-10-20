@@ -4,6 +4,7 @@ This directory is the Codex-owned copy. Claude continues in `C:/SSG_Christmas/pu
 
 - Edit only this project and `C:/SSG_Christmas/pubilla-mimic-codex-hosting` for this work.
 - Treat `../pubilla-mimic` and `../pubilla-mimic-hosting` as read-only references. Never deploy to their current.txt or preview.txt.
+- Exception explicitly authorized by the user on 2026-10-20: promote the reviewed v29 `codex-20261020-094057` build to the original public hosting. Copy that immutable build into a separate release directory and change only its public current.txt, preserving the old build and rollback pointer. This is a one-time promotion; subsequent development and deployments stay in the Codex project/hosting and must not automatically update public production. Claude's source tree and preview.txt remain untouched.
 - Codex URL: https://nau-gyuchan.tailc22fe0.ts.net:10000/ → 127.0.0.1:4175. Activated and verified on 2026-10-20 using a separate Funnel command after the local static server was running. Existing 443 and 8443 routes remain unchanged.
 - Codex development server: http://localhost:5175/.
 - `npm run deploy` in THIS directory builds only into `../pubilla-mimic-codex-hosting` and updates its current.txt. Keep all builds for comparison; no automatic deletion.
