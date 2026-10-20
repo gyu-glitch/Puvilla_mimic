@@ -576,7 +576,7 @@ export class PuuvillaCharacter implements CharacterRig {
           skin.setAttribute('position',new THREE.Float32BufferAttribute(part.positions.flat(),3));
           skin.setAttribute('connectedArmWeights',new THREE.Float32BufferAttribute(standingRig.weights.flat(),3));
           this.applySkinWeights(skin,1,true);
-          this.cageSurface=new StandingCageSurface(part,ch.subdivLevels,standingRig,skin,geo,this.armSurface,cfg.body.armCageRounded!==false,cfg.body.armShoulderMetric===true,cfg.body.armPawRollStart??.30);
+          this.cageSurface=new StandingCageSurface(part,ch.subdivLevels,standingRig,skin,geo,this.armSurface,cfg.body.armCageRounded!==false,cfg.body.armShoulderMetric===true,cfg.body.armPawRollStart??.30,cfg.body.armDistributedTwist===true);
         }else this.armSurface.normalProbes.value=socketNormalProbes(geo);
       }
       const add = (mat: THREE.Material, order: number) => {

@@ -268,6 +268,8 @@ export interface Config {
     armRigPath: string;
     armShoulderMetric?: boolean;
     armPawRollStart?: number;
+    /** Development candidate; disabled unless explicitly selected. */
+    armDistributedTwist?: boolean;
     armPawFrame?: boolean;
     armFollowPose?: boolean;
     armDeform?: 'surface' | 'cage';
