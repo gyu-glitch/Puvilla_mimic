@@ -12,11 +12,14 @@ registerHooks({ resolve(s, c, next) {
 // Exercise the real openCamera/UI application path without opening a camera.
 const listeners = new Map(), timers = new Map();
 let timerId = 0, nextTrack;
+const captureRequests = [];
 globalThis.window = { addEventListener: (name, fn) => listeners.set(name, fn) };
 globalThis.setTimeout = (fn, ms) => { timers.set(++timerId, { fn, ms }); return timerId; };
 globalThis.clearTimeout = id => timers.delete(id);
 Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: {
-  getUserMedia: async () => {
+  getSupportedConstraints: () => ({ resizeMode: true }),
+  getUserMedia: async request => {
+    captureRequests.push(request);
     const track = nextTrack;
     return { getTracks: () => [track], getVideoTracks: () => [track] };
   },
@@ -60,6 +63,9 @@ assert.equal(first.settings.exposureMode, 'continuous',
   'fresh deployment must actively enable auto exposure, even without saved image settings');
 assert.deepEqual(first.calls, [{ exposureMode: 'continuous' }],
   'startup must not force device-specific brightness/contrast/manual exposure');
+assert.deepEqual(captureRequests[0].video, {
+  facingMode: 'user', resizeMode: { exact: 'none' }, frameRate: { ideal: 30 },
+}, 'camera must retain source dimensions instead of requesting a landscape crop');
 assert.equal(timers.size, 3, 'driver warm-up retries must run for auto defaults too');
 
 // The user changes mode during driver warm-up: retries must use the latest choice.

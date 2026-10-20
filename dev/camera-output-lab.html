@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko"><head><base href="/"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>입력 비율·출력 반전 검증</title>
+<style>body{margin:0;color:white;font:14px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:50;background:#17212ddd;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:6px}#cam{object-fit:contain}#cam.mirror{transform:scaleX(-1)}</style>
+</head><body><div id="app"></div><nav>합성 입력 / 실제 캐릭터 렌더
+<button id="portrait">입력 9:16</button><button id="landscape">입력 16:9</button>
+<button id="square">입력 1:1</button><div id="status">로딩 중</div></nav><video id="cam" autoplay muted playsinline></video>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {standingWavePose} from '/src/standingWave.ts';
+import {LockZoneEditor} from '/src/lockZone.ts';
+import {setupViewControls} from '/src/viewControls.ts';
+const cfg=await loadConfig();
+cfg.body.enabled=true;cfg.character.idleBreathAmp=0;cfg.scene.outputMirror=false;
+cfg.scene.layout='landscape';cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});
+await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);
+scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+setupViewControls(cfg,scene,()=>{},backdrop);
+const source=document.createElement('canvas'),video=document.querySelector('#cam');
+source.width=360;source.height=640;
+const ctx=source.getContext('2d');
+function drawSource(){
+ const w=source.width,h=source.height;
+ ctx.fillStyle='#204257';ctx.fillRect(0,0,w,h);
+ ctx.strokeStyle='#ddd';ctx.lineWidth=4;ctx.strokeRect(2,2,w-4,h-4);
+ ctx.fillStyle='#c33';ctx.fillRect(0,0,w,90);
+ ctx.fillStyle='#197b34';ctx.fillRect(0,h-90,w,90);
+ ctx.fillStyle='white';ctx.font='24px sans-serif';ctx.textAlign='center';
+ ctx.fillText('TOP — FULL FRAME',w/2,45);ctx.fillText('BOTTOM — FULL FRAME',w/2,h-35);
+ ctx.fillText(`${w} × ${h}`,w/2,h/2);
+ ctx.textAlign='left';ctx.fillText('L',15,h/2+45);
+ ctx.textAlign='right';ctx.fillText('R',w-15,h/2+45);
+}
+drawSource();video.srcObject=source.captureStream(15);await video.play();
+const editor=new LockZoneEditor(cfg,video,true);
+for(const [id,w,h] of [['portrait',360,640],['landscape',640,360],['square',480,480]]){
+ document.querySelector('#'+id).onclick=()=>{source.width=w;source.height=h;drawSource();};
+}
+const pose=standingWavePose(0,1,1),face={...NEUTRAL_PARAMS,headYaw:.15};
+let last=performance.now();
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ drawSource();editor.draw([]);
+ ch.setState({state:'MIMIC',elapsedMs:1000,progress:1});ch.apply(face,dt,0,pose);scene.render();
+ const box=video.getBoundingClientRect();
+ document.querySelector('#status').textContent=
+  `입력 ${video.videoWidth}×${video.videoHeight} / 표시 ${box.width.toFixed(1)}×${box.height.toFixed(1)} / 출력 반전 ${cfg.scene.outputMirror?'ON':'OFF'}`;
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

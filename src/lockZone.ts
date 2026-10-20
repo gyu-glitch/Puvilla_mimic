@@ -40,8 +40,19 @@ export class LockZoneEditor {
     view.style.cssText = "position:relative;width:100%;aspect-ratio:16/9;touch-action:none";
     this.wrap.appendChild(view);
     if (hasCamera) {
-      video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;border-radius:0;opacity:1";
+      video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;border:0;border-radius:0;opacity:1";
       view.appendChild(video);
+      const fitSource = () => {
+        if (!video.videoWidth || !video.videoHeight) return;
+        const aspect = video.videoWidth / video.videoHeight;
+        view.style.aspectRatio = String(aspect);
+        // Limit height as well as width so portrait footage and controls fit.
+        this.wrap.style.width = `min(42vw,420px,${50 * aspect}vh)`;
+        document.documentElement.style.setProperty("--camera-preview-height", `min(${42 / aspect}vw,${420 / aspect}px,50vh)`);
+      };
+      video.addEventListener("loadedmetadata", fitSource);
+      video.addEventListener("resize", fitSource);
+      fitSource();
     } else {
       const note = document.createElement("div");
       note.textContent = "카메라 없음 (sim) — 락온 영역만 편집 가능";

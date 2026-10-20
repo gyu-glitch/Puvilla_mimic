@@ -142,7 +142,7 @@ async function main(): Promise<void> {
       character = new ProxyCharacter(cfg.character);
     }
   }
-  scene.scene.add(character.root);
+  scene.characterOutput.add(character.root);
   if (forceWave > 0 && character instanceof PuuvillaCharacter) character.debugWave = Math.min(1, forceWave);
   // 주소 ?quality=max / ?quality=0~5 → 품질 단계 고정, 자동 하향 끔
   const qp = qualityParam();

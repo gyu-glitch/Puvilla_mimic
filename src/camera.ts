@@ -68,7 +68,7 @@ export function describeCameraError(e: unknown): string {
 /**
  * 웹캠 열기. deviceLabelIncludes 가 있으면 라벨 부분일치로 장치를 고정한다
  * (USB 포트가 바뀌어 deviceId 가 달라져도 같은 카메라를 잡기 위해).
- * 장치가 바쁘면(NotReadableError) 해상도 조건을 낮춰 가며 몇 초 간격으로 다시 시도한다.
+ * 입력 장치의 비율을 유지하며 연다. 장치가 바쁘면 몇 초 간격으로 다시 시도한다.
  */
 export async function openCamera(
   video: HTMLVideoElement,
@@ -92,11 +92,16 @@ export async function openCamera(
   }
 
   const dev = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" };
-  // 시도 순서: 설정 해상도 → 720p 이하 아무거나 → 조건 없음
+  // Let OBS/the camera choose its native dimensions. Landscape ideals can crop
+  // a portrait source before MediaPipe ever receives the video.
+  const supported = navigator.mediaDevices.getSupportedConstraints?.() as
+    (MediaTrackSupportedConstraints & { resizeMode?: boolean }) | undefined;
+  const noCrop: MediaTrackConstraints & { resizeMode?: { exact: string } } = supported?.resizeMode
+    ? { resizeMode: { exact: "none" } } : {};
   const tries: MediaTrackConstraints[] = [
-    { ...dev, width: { ideal: cfg.width }, height: { ideal: cfg.height }, frameRate: { ideal: cfg.frameRate } },
-    { ...dev, width: { max: 1280 }, height: { max: 720 } },
-    deviceId ? { deviceId: { exact: deviceId } } : {},
+    { ...dev, ...noCrop, frameRate: { ideal: cfg.frameRate } },
+    { ...dev, ...noCrop },
+    { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), ...noCrop },
   ];
 
   let stream: MediaStream | null = null;

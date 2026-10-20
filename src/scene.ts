@@ -13,6 +13,8 @@ const CAM_FOV = 18;
 export class Scene {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
+  /** Output reflection is outside the rig, so it never changes tracked input or joint state. */
+  readonly characterOutput = new THREE.Group();
   readonly camera: THREE.PerspectiveCamera;
   private onLost: (() => void) | null = null;
   private lights!: { key: THREE.DirectionalLight; fill: THREE.DirectionalLight; rim: THREE.DirectionalLight; hemi: THREE.HemisphereLight };
@@ -34,6 +36,7 @@ export class Scene {
   backdrop: { texture: THREE.Texture | null; frontTexture(): THREE.Texture | null; setFrontBaked(on: boolean): void } | null = null;
 
   constructor(container: HTMLElement, private cfg: Config["scene"], private ch: Config["character"], private filterCfg?: Config["filter"]) {
+    this.scene.add(this.characterOutput);
     // 폰·태블릿은 MSAA 끔 (픽셀 밀도가 높아 계단이 덜 보이고 부하는 큼)
     this.renderer = new THREE.WebGLRenderer({ antialias: !lightMobile(), alpha: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -164,6 +167,7 @@ export class Scene {
   ready = false;
 
   render(): void {
+    this.characterOutput.scale.x = this.cfg.outputMirror ? -1 : 1;
     if (this.filterCfg?.oil?.enabled) {
       this.oil ??= new OilStrokeFilter(
         this.renderer, this.scene, this.camera, this.filterCfg.oil, { top: this.cfg.bgTop, bottom: this.cfg.bgBottom },

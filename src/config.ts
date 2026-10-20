@@ -302,6 +302,8 @@ export interface Config {
     envLight: number;
     /** 화면 방향: auto = 기기 방향 따라(세로로 든 폰 = 세로 구도), 가로 / 세로 고정. 왼쪽 아래 버튼으로 전환하면 그 기기에선 고정 */
     layout: "auto" | "landscape" | "portrait";
+    /** 입력·락온·배경을 유지하고 캐릭터 출력만 좌우 반전 */
+    outputMirror: boolean;
     /** 가로 화면 비율(가로/세로) */
     aspect: number;
     /** 가로 시점(캐릭터 cm 기준): 화면 가운데 높이 · 화면에 보이는 높이(작을수록 확대) · 좌우 이동 */
@@ -597,7 +599,7 @@ export const DEFAULT_CONFIG: Config = {
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,
     keyLight: 0.75, fillLight: 0.7, rimLight: 0.7, hemiLight: 1.5, envLight: 0.45,
-    layout: "auto", aspect: 16 / 9, viewCenterCm: 133, viewHeightCm: 90, viewOffsetXcm: 0,
+    layout: "auto", outputMirror: false, aspect: 16 / 9, viewCenterCm: 133, viewHeightCm: 90, viewOffsetXcm: 0,
     pViewCenterCm: 153.5, pViewHeightCm: 123, pViewOffsetXcm: 0, centerLongScreens: false,
   },
   outfit: {
@@ -637,7 +639,7 @@ const localMode = isEmbedded || !import.meta.env.DEV;
 let deployed: Config | null = null;
 /** 화면 시점(가로·세로 확대·이동·방향)은 보는 사람 손에 따라 바뀌는 값 — 개발 서버에서 휠·끌기로 바꿔도 공용 config.json 엔 안 씀
  *  (예전에 확인하느라 축소한 세로 시점이 저장·배포돼 폰에서 곰이 작게 공중에 떠 보였음). 기본 시점은 config.json 을 직접 고쳐서 바꿈. */
-const VIEW_KEYS = ["layout", "viewCenterCm", "viewHeightCm", "viewOffsetXcm", "pViewCenterCm", "pViewHeightCm", "pViewOffsetXcm"] as const;
+const VIEW_KEYS = ["layout", "outputMirror", "viewCenterCm", "viewHeightCm", "viewOffsetXcm", "pViewCenterCm", "pViewHeightCm", "pViewOffsetXcm"] as const;
 let fileView: Record<string, unknown> | null = null;
 
 function diff(cur: unknown, base: unknown): unknown {

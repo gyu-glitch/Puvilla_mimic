@@ -30,6 +30,8 @@ const ICON_OIL =
   '<svg viewBox="0 0 24 24" width="21" height="21" fill="#fff"><path d="M12 3C6.5 3 2.5 6.9 2.5 11.6c0 4.2 3.3 7.4 7.3 7.4 1.4 0 1.9-.8 1.9-1.6 0-1.2-1-1.6-1-2.6 0-.9.7-1.5 1.7-1.5h2.3c3.4 0 6.8-1.7 6.8-5.4C21.5 4.8 17.2 3 12 3z" opacity=".95"/><circle cx="7.2" cy="10.6" r="1.5" fill="#000" opacity=".35"/><circle cx="10.6" cy="7.1" r="1.5" fill="#000" opacity=".35"/><circle cx="15.2" cy="7.4" r="1.5" fill="#000" opacity=".35"/></svg>';
 const ICON_TO_LANDSCAPE =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M18.5 11v2"/></svg>';
+const ICON_MIRROR =
+  '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg>';
 
 export function setupViewControls(
   full: Config,
@@ -59,6 +61,27 @@ export function setupViewControls(
     onChange();
   };
   document.body.appendChild(btn);
+
+  const mirrorBtn = btn.cloneNode() as HTMLButtonElement;
+  mirrorBtn.id = "outputMirrorToggle";
+  mirrorBtn.setAttribute("aria-label", "미믹 출력 좌우반전");
+  mirrorBtn.title = "미믹 출력 좌우반전";
+  mirrorBtn.innerHTML = ICON_MIRROR;
+  const paintMirror = () => {
+    mirrorBtn.setAttribute("aria-pressed", String(!!cfg.outputMirror));
+    mirrorBtn.style.opacity = cfg.outputMirror ? ".95" : ".6";
+    mirrorBtn.style.background = cfg.outputMirror ? "rgba(0,0,0,.5)" : "rgba(0,0,0,.22)";
+  };
+  paintMirror();
+  mirrorBtn.addEventListener("pointerdown", e => e.stopPropagation());
+  mirrorBtn.onclick = e => {
+    e.stopPropagation();
+    cfg.outputMirror = !cfg.outputMirror;
+    paintMirror();
+    if (scene.ready) scene.render();
+    onChange();
+  };
+  document.body.appendChild(mirrorBtn);
 
   // 전체화면 버튼 (Fullscreen API 지원하는 브라우저만 — 아이폰 Safari 는 없음 → 홈 화면에 추가로 전체화면)
   const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
@@ -271,6 +294,9 @@ export function setupViewControls(
     btn.style.left = `calc(12px + env(safe-area-inset-left, 0px))`;
     fsBtn.style.bottom = btn.style.bottom;
     fsBtn.style.left = `calc(60px + env(safe-area-inset-left, 0px))`;
+    mirrorBtn.style.left = `calc(${window.innerWidth < 560 ? 12 : canFull ? 156 : 108}px + env(safe-area-inset-left, 0px))`;
+    mirrorBtn.style.bottom = window.innerWidth < 560
+      ? `calc(${60 + hiddenBelow}px + env(safe-area-inset-bottom, 0px))` : btn.style.bottom;
     fBtn.style.bottom = btn.style.bottom;
     outfitBtns.forEach(([b], i) => {
       b.style.left = "auto";
