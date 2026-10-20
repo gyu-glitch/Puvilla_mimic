@@ -492,3 +492,10 @@
 - 실제 캐릭터 전후 렌더에서 한쪽 든 팔과 고개 방향이 반전되고 입력 L/R·배경은 그대로였다. 390×844 모바일에서도 버튼 접근과 입력 전체 표시 확인. codex-v36-portrait-mirror-{off,on}.png, landscape.png, square.png, mobile.png 보존. 콘솔 오류0.
 - 개발 전용 **codex-20261020-122553** 배포, 외부 config.build와 실제 렌더/↔ 버튼/콘솔 오류0 확인(codex-v36-deployed.png). 주소 https://nau-gyuchan.tailc22fe0.ts.net:10000/?v=20261020-122553 . 공개 current.txt는 codex-promoted-20261020-101333 그대로이며 기존 릴리스 보존.
 - 다음: 사용자의 실제 OBS 세로 입력을 확인하고, 팔 작업은 v35에 남긴 유효 손 방향/fallback 전환부터 이어간다. 이번 입력/UI 수정으로 잔여 팔 비틀림이 해결됐다고 판단하지 않는다.
+
+### v36 공개 반영
+
+- 사용자가 "배포용에반영해야해"라고 명시 지시하여 검증한 개발 빌드 codex-20261020-122553을 그대로 공개 릴리스 codex-promoted-20261020-122553로 복사했다. 62개 파일 SHA256 일치 확인 후 공개 current.txt만 새 릴리스로 변경했다.
+- 이전 공개 v31 및 current.before-codex-v36.txt 복구 포인터 보존. Claude 소스와 preview.txt 미수정. 새 빌드는 v32~v35의 기존 개발 수정도 포함한다.
+- 공개 HTTPS config.build=codex-20261020-122553, index-CDkZWGaY.js 확인. 카메라 주소 https://nau-gyuchan.tailc22fe0.ts.net/?v=20261020-122553 . 이후 개발은 기존 :10000 주소에서 계속하며 추가 공개 반영을 자동 수행하지 않는다.
+- 공개 실제 렌더와 좌하단 ↔ 버튼 표시, 콘솔 오류0 확인. codex-v36-public.png 보존. 실제 OBS 입력 검증 여부는 이전 기록과 동일하다.
