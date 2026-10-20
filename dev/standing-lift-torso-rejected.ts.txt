@@ -1,0 +1,37 @@
+import {Quaternion,Vector3} from 'three';
+import {standingTorsoClearance} from './standingTorsoClearance';
+
+/** Body-only avoidance: turn only the forearm horizontally. Never change upper-arm
+ * direction, forearm elevation or limb length.
+ * When no horizontal exit exists, lifting takes priority over the proxy. */
+export function clearStandingLiftTorso(
+ shoulder:Vector3,length:number,rest:Vector3,upperQ:Quaternion,foreQ:Quaternion,chest?:Quaternion,
+):number {
+ const upper=rest.clone().applyQuaternion(upperQ);
+ const fore=rest.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);
+ const distance=(yaw:number)=>{
+  const q=new Quaternion().setFromAxisAngle(new Vector3(0,1,0),yaw);
+  return standingTorsoClearance(shoulder,length,upper,fore.clone().applyQuaternion(q),chest).distance;
+ };
+ const before=distance(0);
+ if(before>=1.015)return 0;
+ // Keep the observed height; use a front/outward horizontal exit only.
+ const outward=Math.sign(shoulder.x)*Math.atan2(.15,1);
+ const phi=Math.atan2(fore.x,fore.z);
+ const arc=Math.atan2(Math.sin(outward-phi),Math.cos(outward-phi));
+ let lo=0,hi=0,best=before,found=false;
+ for(let i=1;i<=32;i++){
+  const t=i/32,rho=distance(arc*t);
+  if(rho>best){best=rho;hi=t;}
+  if(rho>=1.015){lo=(i-1)/32;hi=t;found=true;break;}
+ }
+ if(found)for(let i=0;i<14;i++){
+  const mid=(lo+hi)/2;
+  if(distance(arc*mid)>=1.015)hi=mid;else lo=mid;
+ }
+ if(best<=before+1e-8)return 0;
+ const yaw=arc*hi;
+ fore.applyQuaternion(new Quaternion().setFromAxisAngle(new Vector3(0,1,0),yaw));
+ foreQ.setFromUnitVectors(rest,fore.applyQuaternion(upperQ.clone().invert()));
+ return Math.abs(yaw);
+}

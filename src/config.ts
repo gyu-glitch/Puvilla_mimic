@@ -269,6 +269,7 @@ export interface Config {
     armShoulderMetric?: boolean;
     armPawRollStart?: number;
     armPawFrame?: boolean;
+    armFollowPose?: boolean;
     armDeform?: 'surface' | 'cage';
     armCageRounded?: boolean;
     armHeadClearance?: boolean;
@@ -575,13 +576,16 @@ export const DEFAULT_CONFIG: Config = {
     armRig: "connected",
     armRigPath: "./models/stand_connected_cage_rig.json",
     armDeform: 'cage',
-    armHeadClearance: true,
+    armHeadClearance: false,
+    armHeadContact: false,
+    armUpperClearance: false,
     armPawHold: true,
     armContinuousAzimuth: true,
     armTorsoClearance: true,
-    armPawContact: true,
+    armPawContact: false,
     armElbowPlane: true,
     armPawFrame: true,
+    armFollowPose: true,
   },
   scene: {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,

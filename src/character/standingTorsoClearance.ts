@@ -1,5 +1,6 @@
 import {Quaternion,Vector3} from 'three';
 import {RoundedElbowFrame} from './standingBend';
+import {preserveStandingLift,preserveLiftDirection} from './standingLiftTorso';
 
 // Conservative proxy around the source's rounded belly, inflated by the paw
 // thickness. It constrains the arm joints, never the torso or paw geometry.
@@ -22,7 +23,7 @@ export function standingTorsoClearance(shoulder:Vector3,length:number,upper:Vect
  return {distance,gradient};
 }
 
-export function clearStandingTorso(shoulder:Vector3,length:number,restAxis:Vector3,upperQ:Quaternion,foreQ:Quaternion,chest?:Quaternion):number{
+export function clearStandingTorso(shoulder:Vector3,length:number,restAxis:Vector3,upperQ:Quaternion,foreQ:Quaternion,chest?:Quaternion,lift=false):number{
  const upper=restAxis.clone().applyQuaternion(upperQ),desired=restAxis.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);
  const before=standingTorsoClearance(shoulder,length,upper,desired,chest).distance;
  if(before>=1.015)return 0;
@@ -30,6 +31,7 @@ export function clearStandingTorso(shoulder:Vector3,length:number,restAxis:Vecto
  // closest exits from the belly's interior. The latter flips near its center.
  const front=new Vector3(Math.sign(shoulder.x)*.15,0,1).normalize();
  if(chest)front.applyQuaternion(chest.clone().invert());
+ if(lift)preserveLiftDirection(front,desired);
  const rotation=new Quaternion().setFromUnitVectors(desired,front),angle=desired.angleTo(front);
  const limit=Math.min(1,1.5/Math.max(1e-8,angle)),fore=new Vector3(),q=new Quaternion();
  const at=(t:number)=>{q.identity().slerp(rotation,t);return fore.copy(desired).applyQuaternion(q);};
@@ -54,13 +56,19 @@ export class StandingTorsoContact {
  private previous:Vector3|null=null;
  private hadContact=false;
  reset(){this.previous=null;this.hadContact=false;}
- solve(shoulder:Vector3,length:number,restAxis:Vector3,upperQ:Quaternion,foreQ:Quaternion,dt:number,chest?:Quaternion){
+ solveLift(shoulder:Vector3,length:number,restAxis:Vector3,upperQ:Quaternion,foreQ:Quaternion,dt:number,chest?:Quaternion){
+  const desired=restAxis.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);
+  this.solve(shoulder,length,restAxis,upperQ,foreQ,dt,chest,true);
+  preserveStandingLift(restAxis,upperQ,foreQ,desired);
+  this.previous=restAxis.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);
+ }
+ solve(shoulder:Vector3,length:number,restAxis:Vector3,upperQ:Quaternion,foreQ:Quaternion,dt:number,chest?:Quaternion,lift=false){
   const upper=restAxis.clone().applyQuaternion(upperQ),desired=restAxis.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);
   const distance=(f:Vector3)=>standingTorsoClearance(shoulder,length,upper,f,chest).distance;
   const rotation=new Quaternion(),q=new Quaternion(),candidate=new Vector3();
   if(!this.previous){
    this.hadContact=distance(desired)<1.015;
-   clearStandingTorso(shoulder,length,restAxis,upperQ,foreQ,chest);
+   clearStandingTorso(shoulder,length,restAxis,upperQ,foreQ,chest,lift);
    this.previous=restAxis.clone().applyQuaternion(foreQ).applyQuaternion(upperQ);return;
   }
   const previous=this.previous;
@@ -72,24 +80,28 @@ export class StandingTorsoContact {
   if(free){
    if(this.hadContact&&angle>step){
     previous.applyQuaternion(q.identity().slerp(rotation,step/angle));
+    if(lift)preserveLiftDirection(previous,desired);
     foreQ.setFromUnitVectors(restAxis,candidate.copy(previous).applyQuaternion(upperQ.clone().invert()));return;
    }
    previous.copy(desired);this.hadContact=false;return;
   }
   this.hadContact=true;
   candidate.copy(previous).applyQuaternion(q.identity().slerp(rotation,Math.min(1,step/Math.max(angle,1e-8))));
+  if(lift)preserveLiftDirection(candidate,desired);
   for(let i=0;i<12;i++){
    const {distance:rho,gradient}=standingTorsoClearance(shoulder,length,upper,candidate,chest);
    if(rho>=1.015)break;
    gradient.addScaledVector(candidate,-gradient.dot(candidate));
    if(gradient.lengthSq()<1e-8)break;
    candidate.addScaledVector(gradient.normalize(),Math.min(.08,(1.015-rho)*.8)).normalize();
+   if(lift)preserveLiftDirection(candidate,desired);
   }
   const correction=previous.angleTo(candidate);
   if(correction>step){
    rotation.setFromUnitVectors(previous,candidate);
    candidate.copy(previous).applyQuaternion(q.identity().slerp(rotation,step/correction));
   }
+  if(lift)preserveLiftDirection(candidate,desired);
   previous.copy(candidate);
   foreQ.setFromUnitVectors(restAxis,candidate.applyQuaternion(upperQ.clone().invert()));
  }

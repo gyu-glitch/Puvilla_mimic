@@ -15,7 +15,7 @@ import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms
 import { StandingArmSurface } from "./standingArmSurface";
 import { socketNormalProbes } from "./standingSocketNormals";
 import { standingWaveMotion } from "../standingWave";
-import { standingUpperDirection } from "./standingArmPose";
+import { standingUpperDirection, standingFollowDirection } from "./standingArmPose";
 import { StandingTorsoContact } from "./standingTorsoClearance";
 import {separateStandingPaws} from './standingPawContact';
 import {StandingElbowPlane} from './standingElbowPlane';
@@ -1023,6 +1023,8 @@ export class PuuvillaCharacter implements CharacterRig {
     // ── 팔 ──
     const fa = this.cfg.character;
     const upperContacts=[false,false];
+    const following=this.arms.map(arm=>!!(this.connectedArms&&this.cfg.body.armFollowPose&&pose&&
+      (arm.side>0?pose.armL:pose.armR)>=this.cfg.body.minVisibility));
     for (const arm of this.arms) {
       const tu = arm.tUpper.identity();
       const tf = arm.tFore.identity();
@@ -1078,17 +1080,24 @@ export class PuuvillaCharacter implements CharacterRig {
           tf.copy(_qIdleF);
         }
       }
-      if(this.connectedArms && this.cfg.body.armTorsoClearance){
+      const follow=following[arm.side>0?0:1];
+      if(follow){
+        if(this.cfg.body.armTorsoClearance){
+          const j=this.armJoints.find(j=>j.side===arm.side)!;
+          this.torsoContact[arm.side>0?0:1].solveLift(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,dtSec,chest.quaternion);
+        }
+      }
+      if(!follow && this.connectedArms && this.cfg.body.armTorsoClearance){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         this.torsoContact[arm.side>0?0:1].solve(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,dtSec,chest.quaternion);
       }
-      if(this.connectedArms && this.cfg.body.armHeadClearance){
+      if(!follow && this.connectedArms && this.cfg.body.armHeadClearance){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         if(this.cfg.body.armUpperClearance)upperContacts[arm.side>0?0:1]=clearStandingUpper(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,head.quaternion)>1e-7;
         clearStandingForearm(j.s,j.h.distanceTo(j.s),arm.restFore,tu,tf,head.quaternion);
       }
     }
-    if(this.connectedArms && this.cfg.body.armPawContact){
+    if(!following.some(Boolean) && this.connectedArms && this.cfg.body.armPawContact){
       separateStandingPaws(this.arms.map(arm=>{
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         return {shoulder:j.s,length:j.h.distanceTo(j.s),rest:arm.restFore,upper:arm.tUpper,fore:arm.tFore};
@@ -1099,12 +1108,12 @@ export class PuuvillaCharacter implements CharacterRig {
       const contactIndex=arm.side>0?0:1,previousUpper=arm.qUpper.clone(),previousFore=arm.qFore.clone();
       arm.qUpper.slerp(arm.tUpper, k);
       arm.qFore.slerp(arm.tFore, k);
-      if(this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
+      if(!following[contactIndex] && this.connectedArms && this.cfg.body.armHeadClearance && this.cfg.body.armHeadContact!==false){
         const j=this.armJoints.find(j=>j.side===arm.side)!;
         if(this.cfg.body.armUpperClearance)upperContacts[contactIndex]=resolveStandingUpperContact(j.s,j.h.distanceTo(j.s),arm.restFore,arm.qUpper,arm.qFore,head.quaternion,dtSec)>1e-7||upperContacts[contactIndex];
         resolveStandingHeadContact(j.s,j.h.distanceTo(j.s),arm.restFore,arm.qUpper,arm.qFore,head.quaternion,dtSec);
       }
-      if(this.cfg.body.armUpperClearance && (upperContacts[contactIndex]||this.upperContactActive[contactIndex])){
+      if(!following[contactIndex] && this.cfg.body.armUpperClearance && (upperContacts[contactIndex]||this.upperContactActive[contactIndex])){
         const limited=limitStandingContactMotion(arm.restFore,previousUpper,previousFore,arm.qUpper,arm.qFore,dtSec);
         this.upperContactActive[contactIndex]=upperContacts[contactIndex]||limited;
       }else this.upperContactActive[contactIndex]=false;
@@ -1295,7 +1304,9 @@ export class PuuvillaCharacter implements CharacterRig {
     const theta2 = this.armsFree
       ? Math.min(this.cfg.character.freeArmRaiseMaxRad, theta)
       : Math.min(this.cfg.body.armRaiseMaxRad, arm.restPolar + (theta * (Math.PI - arm.restPolar)) / Math.PI);
-    const d = this.connectedArms
+    const d = this.connectedArms&&this.cfg.body.armFollowPose
+      ? standingFollowDirection(arm.side,arm.restUpper,tu)
+      : this.connectedArms
       ? standingUpperDirection(arm.side,arm.restUpper,tu,this.cfg.body.armRaiseMaxRad,this.cfg.body.armContinuousAzimuth===true)
       : polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);

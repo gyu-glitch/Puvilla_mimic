@@ -26,3 +26,14 @@ export function standingAzimuth(raw:number):number {
   const gap=tau-(hi-lo),distance=(phi-hi+tau)%tau;
   return hi+(lo-hi)*smooth(.15,.85,distance/gap);
 }
+
+/** Follow raised camera arms directly. Only the source's relaxed A-pose has a
+ * lower bound; the old offset continued lifting the arm even around 40–70deg. */
+export function standingFollowDirection(side:1|-1,rest:Vector3,human:Vector3):Vector3 {
+ const theta=Math.acos(Math.max(-1,Math.min(1,-human.y))),neutral=Math.acos(-rest.y);
+ const band=.12,h=Math.max(0,band-Math.abs(theta-neutral))/band;
+ const raised=Math.max(theta,neutral)+h*h*band*.25;
+ const sourcePhi=Math.atan2(rest.z,side*rest.x),observedPhi=Math.atan2(human.z,side*human.x);
+ const phi=sourcePhi+Math.atan2(Math.sin(observedPhi-sourcePhi),Math.cos(observedPhi-sourcePhi))*smooth(.12,.65,theta);
+ return new Vector3(side*Math.sin(raised)*Math.cos(phi),-Math.cos(raised),Math.sin(raised)*Math.sin(phi));
+}
