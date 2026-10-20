@@ -48,4 +48,27 @@ assert.ok(processor.update(invalid,true,1650));assert.equal(processor.update(inv
 const recovered=processor.update(raw(),true,2300);assert.ok(recovered.wristR.every(Number.isFinite));
 const nearest=raw(),other=raw();other.nose={x:.9,y:.3};other.shoulderW=.8;
 assert.equal(BodyProcessor.pickForFace([other,nearest],{cx:.5,cy:.3,h:.2}),nearest);
+// The hand span must mirror with its arm and never accept a degenerate or
+// occluded palm direction. These are independent from wrist position tracking.
+const handRaw=raw();
+Object.assign(handRaw.world[17],{x:.53,y:-.62,z:-.2});
+Object.assign(handRaw.world[19],{x:.47,y:-.62,z:-.2});
+const handProcessor=new BodyProcessor(cfg);
+const hand=handProcessor.update(handRaw,true,1000);
+assert.ok(hand.handAcrossR[0]>.99,'mirrored raised palm thumb must face toward the head');
+handRaw.world[19].visibility=.1;
+assert.equal(handProcessor.update(handRaw,true,1100).handAcrossR,undefined);
+assert.ok(handProcessor.update(handRaw,true,1100).armR>=cfg.body.minVisibility,'bad palm discarded a valid arm');
+handRaw.world[19].visibility=1;Object.assign(handRaw.world[19],handRaw.world[17]);
+assert.equal(handProcessor.update(handRaw,true,1200).handAcrossR,undefined);
+const {standingWavePose}=await import('../src/standingWave.ts');
+const start=standingWavePose(0,0),wave=standingWavePose(0);
+assert.ok(start.wristR[1]<start.elbowR[1]);
+assert.ok(wave.wristR[1]>wave.elbowR[1]&&wave.elbowR[1]>wave.shoulderR[1],'greeting must rise along the whole arm');
+let xmin=Infinity,xmax=-Infinity;
+for(let t=0;t<6;t+=.02){const p=standingWavePose(t);xmin=Math.min(xmin,p.wristR[0]);xmax=Math.max(xmax,p.wristR[0]);
+ assert.deepEqual(p.shoulderR,wave.shoulderR);assert.deepEqual(p.elbowR,wave.elbowR);assert.deepEqual(p.wristL,wave.wristL);
+}
+assert.ok(xmax-xmin>.02&&xmax-xmin<.05,'greeting swing should remain small');
+console.log('PASS: mirrored hand orientation; invalid/occluded palm fallback; continuous reference wave with fixed shoulder and small forearm swing.');
 console.log(`PASS: original body/scarf hashes; ${torso} fixed torso/head vertices; ${arms} fully weighted arm vertices; symmetric joints; mirrored tracking; independent occlusion hold/release; NaN recovery; face/body association.`);

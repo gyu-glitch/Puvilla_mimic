@@ -291,6 +291,8 @@ export interface Config {
     /** 세로 시점 (같은 의미) */
     pViewCenterCm: number;
     pViewHeightCm: number;
+    /** Keep the character centered when fitting a narrower screen to arm width. */
+    centerLongScreens: boolean;
     pViewOffsetXcm: number;
   };
   /** 의상: classic = 기존 줄무늬 스카프 / christmas = 뜨개 목도리(새 FBX). 오른쪽 아래 아이콘으로 전환 */
@@ -564,7 +566,7 @@ export const DEFAULT_CONFIG: Config = {
     bgTop: "#F76A4B", bgBottom: "#E2462A", exposure: 0.95, cameraTiltDeg: -6,
     keyLight: 0.75, fillLight: 0.7, rimLight: 0.7, hemiLight: 1.5, envLight: 0.45,
     layout: "auto", aspect: 16 / 9, viewCenterCm: 133, viewHeightCm: 90, viewOffsetXcm: 0,
-    pViewCenterCm: 153.5, pViewHeightCm: 123, pViewOffsetXcm: 0,
+    pViewCenterCm: 153.5, pViewHeightCm: 123, pViewOffsetXcm: 0, centerLongScreens: false,
   },
   outfit: {
     style: "christmas", // 기본 = 뜨개 목도리 (곰 아이콘으로 기존 스카프)

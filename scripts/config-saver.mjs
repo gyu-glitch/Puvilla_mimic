@@ -7,6 +7,28 @@ export default function configSaver() {
   return {
     name: "mimic-config-saver",
     configureServer(server) {
+      // Local render exports only. Separate from camera/pose telemetry.
+      server.middlewares.use("/__mimic/capture", (req, res) => {
+        if(req.method!=="POST" || !/^http:\/\/(localhost|127\.0\.0\.1):5175$/.test(req.headers.origin||"")){
+          res.statusCode=403;res.end();return;
+        }
+        let body="",size=0,tooLarge=false;
+        req.on("data",chunk=>{size+=chunk.length;if(size>24*1024*1024){tooLarge=true;return;}body+=chunk;});
+        req.on("end",()=>{
+          if(tooLarge){res.statusCode=413;res.end();return;}
+          try{
+            const {name,data}=JSON.parse(body);
+            if(!/^[a-z0-9-]{1,80}$/.test(name))throw new Error('Invalid name');
+            const match=/^data:(image\/png|video\/webm)(?:;codecs=[^;,]+)?;base64,([A-Za-z0-9+/=]+)$/.exec(data);
+            if(!match)throw new Error('Invalid render data');
+            const extension=match[1]==='image/png'?'png':'webm';
+            const dir=resolve(server.config.root,'docs/arm-review');mkdirSync(dir,{recursive:true});
+            const file=`${name}.${extension}`;
+            writeFileSync(resolve(dir,file),Buffer.from(match[2],'base64'));
+            res.setHeader('content-type','application/json');res.end(JSON.stringify({file}));
+          }catch{res.statusCode=400;res.end('Invalid render capture');}
+        });
+      });
       server.middlewares.use("/__mimic/save-config", (req, res) => {
         if (req.method !== "POST") {
           res.statusCode = 405;

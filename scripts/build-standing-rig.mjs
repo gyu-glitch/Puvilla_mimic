@@ -75,6 +75,23 @@ for(const key of ['shoulder','hand']){
  joints.L[key]=v;joints.R[key]=[-v[0],v[1],v[2]];
 }
 for(const side of ['L','R'])joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
+const portrait=!process.argv.includes('--legacy')&&!process.argv.includes('--sections');
+if(portrait)for(const side of ['L','R']){
+ joints[side].shoulder[1]-=3;
+ joints[side].elbow=joints[side].shoulder.map((v,i)=>(v+joints[side].hand[i])/2);
+}
+// Experimental cross-section weights: every point on a plane normal to the
+// neutral limb axis receives the same elbow blend, irrespective of surface path.
+const sections=portrait||process.argv.includes('--sections');
+if(sections){
+ for(let i=0;i<P.length;i++){
+  const side=P[i][0]>=0?'L':'R',j=joints[side];
+  const axis=j.hand.map((v,k)=>v-j.shoulder[k]),length=Math.hypot(...axis);
+  const along=P[i].reduce((s,v,k)=>s+(v-j.elbow[k])*axis[k]/length,0);
+  weights[i][2]=(weights[i][0]+weights[i][1])*smooth(-6,6,along);
+ }
+}
 const data={version:1,sourceSha256:createHash('sha256').update(source).digest('hex'),body:mesh.name,rest:P,weights,joints};
-writeFileSync('public/models/stand_connected_rig.json',JSON.stringify(data));
+const suffix=process.argv.includes('--portrait')?'_portrait':process.argv.includes('--sections')?'_sections':process.argv.includes('--legacy')?'_legacy':'';
+writeFileSync(`public/models/stand_connected_rig${suffix}.json`,JSON.stringify(data));
 console.log(`Saved connected rig: ${P.length} cage vertices, original topology unchanged.`);

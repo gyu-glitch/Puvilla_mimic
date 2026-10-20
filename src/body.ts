@@ -13,6 +13,8 @@ export interface BodyPose {
   shoulderL: V3; shoulderR: V3;
   elbowL: V3; elbowR: V3;
   wristL: V3; wristR: V3;
+  /** Pinky-to-index direction, when the pose model has a reliable hand span. */
+  handAcrossL?: V3; handAcrossR?: V3;
   hipL: V3; hipR: V3;
   /** 0~1 신뢰도 */
   armL: number;
@@ -111,8 +113,20 @@ export class BodyProcessor {
     }
 
     this.lastSeenMs = nowMs;
+    const hands: { handAcrossL?: V3; handAcrossR?: V3 } = {};
+    for(const s of ['L','R'] as const){
+      // MediaPipe Pose: left pinky/index 17/19, right pinky/index 18/20.
+      const right = side[s][0] === LM.rShoulder;
+      const pinky=right?18:17, index=right?20:19;
+      if(Math.min(vis(pinky),vis(index),armConfidence[s]) < Math.max(.6,this.cfg.body.minVisibility))continue;
+      const a=pick(index),b=pick(pinky),span=a.map((v,i)=>v-b[i]) as V3;
+      const length=Math.hypot(...span);
+      if(length<.015||length>.20)continue;
+      hands[`handAcross${s}`]=span.map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v/length,t)) as V3;
+    }
     this.last = {
       ...pts,
+      ...hands,
       armL: armConfidence.L,
       armR: armConfidence.R,
       hips: Math.min(vis(LM.lHip), vis(LM.rHip)),

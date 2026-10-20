@@ -56,12 +56,12 @@ deploy 스크립트는 Codex 호스팅만 사용하도록 수정했고 자동 �
 
 로컬 서버는 현재 Codex 명령 세션으로 실행 중이다. 재로그인 자동 시작은 등록하지 않았다. `scripts/serve-codex.ps1`은 수동 시작용 재시작 루프다.
 
-## 외부 주소 연결 미완료
+## 외부 주소 연결 완료
 
-전용 서버 시작·Funnel 연결·빌드가 포함된 명령이 자동 승인 검토에서 `blocked by policy`로 거절됐다. 구체적인 이유는 도구 응답에 없었다. 이후 로컬 전용 서버 실행과 빌드는 별도로 완료했다. Tailscale 조회 결과 기존 443/8443만 있으며 10000 연결은 없다.
+https://nau-gyuchan.tailc22fe0.ts.net:10000/ → 127.0.0.1:4175
 
-외부 연결은 사용자 측에서 아래 명령을 실행하거나 차단이 해소된 후 별도 검증이 필요하다.
+2026-10-20, 실행 중인 Codex 정적 서버에 대한 단독 Funnel 명령으로 연결했다. 외부 URL의 config.json 빌드와 브라우저 렌더를 확인했다. 기존 443 → 4173, 8443 → 4174는 그대로다. 초기의 서버 시작·연결·빌드 복합 명령은 차단됐었으나 이 독립 연결 단계는 성공했다.
 
-```powershell
-& 'C:\Program Files\Tailscale\tailscale.exe' funnel --bg --https=10000 http://127.0.0.1:4175
-```
+손인사 자동 데모: https://nau-gyuchan.tailc22fe0.ts.net:10000/?sim=1&armdemo=wave
+
+현재 배포: `codex-20261020-031239`. 이후 `npm run deploy`로 이 주소만 업데이트한다. 로컬 서버 재로그인 자동 시작은 여전히 등록하지 않았다.

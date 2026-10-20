@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Config } from "./config";
 import { emptySignal, type FaceSignal } from "./signals";
 import type { BodyPose, V3 } from "./body";
+import { standingWavePose } from './standingWave';
 
 /**
  * `?sim=1` — 웹캠 없이 캐릭터·FSM 을 확인하는 시뮬레이터. 카메라/트래커를 건너뛰고 FaceSignal 을 직접 만든다.
@@ -21,6 +22,8 @@ export class SimInput {
   private bodyOn = true;
   private level: Record<string, number> = {};
   private armDemo = new URLSearchParams(location.search).get("armdemo") === "1";
+  private waveDemo = new URLSearchParams(location.search).get("armdemo") === "wave";
+  private waveStart: number | null = null;
 
   constructor(private cfg: Config) {
     window.addEventListener("keydown", (e) => {
@@ -32,6 +35,7 @@ export class SimInput {
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
     window.addEventListener("blur", () => this.keys.clear());
     window.addEventListener("pointermove", (e) => {
+      if(this.waveDemo)return;
       this.mx = (e.clientX / window.innerWidth) * 2 - 1;
       this.my = (e.clientY / window.innerHeight) * 2 - 1;
     });
@@ -57,6 +61,12 @@ export class SimInput {
   /** 상반신 시뮬레이션 (캐릭터 공간, m). update() 다음에 호출 */
   body(timeSec: number): BodyPose | null {
     if (!this.present || !this.bodyOn) return null;
+    if(this.waveDemo){
+      this.waveStart ??= timeSec;
+      const t=timeSec-this.waveStart;
+      const a=Math.min(1,t/1.5),lift=a*a*(3-2*a);
+      return standingWavePose(t,lift);
+    }
     const lv = (k: string) => this.level_(k, this.ease);
     const R = new THREE.Quaternion().setFromEuler(
       new THREE.Euler(0, (lv("x") - lv("z")) * 0.5, (lv("e") - lv("q")) * 0.35, "YXZ"),
@@ -77,9 +87,9 @@ export class SimInput {
         phF = phU;
       }
       if (wave > 0) {
-        thU = thU + (1.45 - thU) * wave;
-        thF = thF + (2.7 - thF) * wave;
-        phF = phF + Math.sin(timeSec * 8) * 0.5 * wave;
+        thU = thU + (2.4 - thU) * wave;
+        thF = thF + (2.86+Math.sin(timeSec*2.5)*.08 - thF) * wave;
+        phU = phU + (.08-phU)*wave;phF=phU;
       }
       const s = new THREE.Vector3(side * 0.18, 0.48, 0);
       const e = s.clone().add(dir(side, thU, phU).multiplyScalar(0.27));

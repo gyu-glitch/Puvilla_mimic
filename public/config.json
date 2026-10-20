@@ -188,12 +188,13 @@
     "envLight": 0.45,
     "layout": "auto",
     "aspect": 1.7777777777777777,
-    "viewCenterCm": 133,
-    "viewHeightCm": 90,
+    "viewCenterCm": 128,
+    "viewHeightCm": 155,
     "viewOffsetXcm": 0,
-    "pViewCenterCm": 153.5,
-    "pViewHeightCm": 123,
-    "pViewOffsetXcm": 0
+    "pViewCenterCm": 110,
+    "pViewHeightCm": 245,
+    "pViewOffsetXcm": 0,
+    "centerLongScreens": true
   },
   "filter": {
     "enabled": false,

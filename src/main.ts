@@ -53,10 +53,11 @@ async function main(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const kiosk = isKiosk();
   const sim = params.get("sim") === "1" ? new SimInput(cfg) : null;
-  if (sim && params.get("armdemo") === "1") {
+  if (sim && params.has("armdemo")) {
     cfg.body.enabled = true;
     // Review-only framing so the hands stay visible; no settings are saved here.
     Object.assign(cfg.scene, { viewCenterCm: 115, viewHeightCm: 210, pViewCenterCm: 115, pViewHeightCm: 250 });
+    if(params.get('armdemo')==='wave')Object.assign(cfg.scene,{viewCenterCm:128,viewHeightCm:155,pViewCenterCm:110,pViewHeightCm:245,centerLongScreens:true});
   }
   if (kiosk) await setupKiosk(cfg.kiosk);
 

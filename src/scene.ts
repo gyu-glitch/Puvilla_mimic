@@ -150,7 +150,7 @@ export class Scene {
     const t = Math.tan(((CAM_FOV / 2) * Math.PI) / 180);
     const dist = ((visH / 2) * s) / t;
     const cx = v.offsetX * s;
-    const cy = (bottom + visH / 2 - this.ch.focusYcm) * s;
+    const cy = ((this.cfg.centerLongScreens ? v.center : bottom + visH / 2) - this.ch.focusYcm) * s;
     // 음수 각이면 위에서 살짝 내려다봄 → 앞으로 나온 코가 화면에서 내려가 눈과 떨어져 보인다 (가이드 렌더 구도)
     const tilt = (this.cfg.cameraTiltDeg * Math.PI) / 180;
     this.camera.position.set(cx, cy - dist * Math.sin(tilt), dist * Math.cos(tilt));

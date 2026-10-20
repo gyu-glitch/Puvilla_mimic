@@ -9,6 +9,7 @@ import { fixInvertedWinding, parseObj, subdivide, toBufferGeometry, type PolyMes
 import { fillMouthGroove, smoothDepth } from "./mouthRig";
 import { bakeKnitShadow, bakeVertexColors, fitMuffler, loadFitted, loadMuffler, makeKnitMaterial, pca, type MufflerSrc } from "./outfit";
 import { makeBodyMaterial, makeInkMaterial, makeScarfMaterial, type FaceUniforms, type FurUniforms } from "./puuvillaShaders";
+import { StandingArmSurface } from "./standingArmSurface";
 
 /**
  * 실제 푸빌라 3D (asset/PUUVILLA IP FINAL/3 3D FILE/푸빌라_3D/푸빌라_스카프_obj/pu_stand.obj).
@@ -175,6 +176,8 @@ export class PuuvillaCharacter implements CharacterRig {
   private cur: CharacterParams = { ...NEUTRAL_PARAMS };
   /** 개발: 손 흔들기 강제 (0~1) — __mimic.character.debugWave = 1 */
   debugWave = 0;
+  /** Development comparison; null keeps the normal raised-paw roll. */
+  debugPawTurn: number | null = null;
 
   static async load(cfg: Config): Promise<PuuvillaCharacter> {
     const t0 = performance.now();
@@ -270,9 +273,11 @@ export class PuuvillaCharacter implements CharacterRig {
   /** 팔 부품 가늘게 하기: 정점마다 축 위 발(foot)과 반지름 벡터 (바인드 기준) — 들수록 radial 을 줄임 */
   private armSlim: { geo: THREE.BufferGeometry; side: 1 | -1; foot: Float32Array; radial: Float32Array; cur: number }[] = [];
   private connectedArms = false;
+  private armSurface: StandingArmSurface | null = null;
 
   private constructor(private cfg: Config, parts: PolyMesh[], private sit = false, private seat: SeatRig | null = null, armJointsFile: ArmJoints | null = null, standingRig: StandingRig | null = null) {
     this.connectedArms = standingRig !== null;
+    if (standingRig) this.armSurface = new StandingArmSurface(standingRig.joints);
     const ch = cfg.character, fc = cfg.face, fr = cfg.fur;
     const A = ANATOMY;
 
@@ -549,6 +554,7 @@ export class PuuvillaCharacter implements CharacterRig {
       }
 
       const add = (mat: THREE.Material, order: number) => {
+        if (geo.getAttribute("connectedArmWeights")) this.armSurface?.attach(mat);
         const m = new THREE.SkinnedMesh(geo, mat);
         m.frustumCulled = false;
         m.renderOrder = order;
@@ -991,7 +997,8 @@ export class PuuvillaCharacter implements CharacterRig {
         _qIdle.setFromUnitVectors(arm.restUpper, polarDir(arm.side, fa.freeArmIdleTheta, fa.freeArmIdlePhi));
         _qIdleF.setFromAxisAngle(_n.set(1, 0, 0), -fa.freeArmIdleElbow);
       } else {
-        _qIdle.identity();
+        if(this.connectedArms)_qIdle.setFromUnitVectors(arm.restUpper,polarDir(arm.side,.43,0));
+        else _qIdle.identity();
         _qIdleF.identity();
       }
       if (pose && conf >= this.cfg.body.minVisibility) {
@@ -1021,16 +1028,16 @@ export class PuuvillaCharacter implements CharacterRig {
           tu.slerp(ID, 1 - wave);
           tf.slerp(ID, 1 - wave);
         } else {
-          const d = polarDir(arm.side, 2.1, 0.35);
-          tu.setFromUnitVectors(arm.restUpper, d).slerp(ID, 1 - wave);
+          const d = polarDir(arm.side, this.connectedArms?2.4:2.1, this.connectedArms ? .08 : .35);
+          tu.setFromUnitVectors(arm.restUpper, d).slerp(this.connectedArms?_qIdle:ID, 1 - wave);
           _n.set(0, 0, 1);
-          tf.setFromAxisAngle(_n, arm.side * (0.5 + Math.sin(timeSec * 9) * 0.35) * wave);
+          tf.setFromAxisAngle(_n, arm.side * (this.connectedArms?(.46+Math.sin(timeSec*2.5)*.08):(.5+Math.sin(timeSec*9)*.35)) * wave);
         }
       } else {
         const sway = Math.sin(timeSec * 1.3 + (arm.side > 0 ? 0 : 1.1)) * 0.03;
         _n.set(0, 0, 1);
         tu.setFromAxisAngle(_n, sway * arm.side);
-        if (this.armsFree) {
+        if (this.armsFree || this.connectedArms) {
           tu.premultiply(_qIdle);
           tf.copy(_qIdleF);
         }
@@ -1039,6 +1046,33 @@ export class PuuvillaCharacter implements CharacterRig {
       arm.qFore.slerp(tf, k);
       arm.upper.quaternion.copy(arm.qUpper);
       arm.fore.quaternion.copy(arm.qFore);
+      if (this.armSurface) {
+        const i = arm.side > 0 ? 0 : 1;
+        const direction = arm.restFore.clone().applyQuaternion(arm.qFore).applyQuaternion(arm.qUpper);
+        const raised = smooth(-.35, .65, direction.y);
+        // Roll the original paw so its thumb faces inward when raised. Spread
+        // the distal paw gently; the neutral model is bit-for-bit unchanged.
+        let target = arm.side * (this.debugPawTurn ?? -Math.PI/2) * raised;
+        const across=pose && conf>=this.cfg.body.minVisibility ? (arm.side>0?pose.handAcrossL:pose.handAcrossR) : undefined;
+        if(across && this.debugPawTurn===null){
+          const humanFore=vec(arm.side>0?pose!.wristL:pose!.wristR)
+            .sub(vec(arm.side>0?pose!.elbowL:pose!.elbowR)).normalize()
+            .applyQuaternion(humanTorso.clone().invert());
+          const tracked=vec(across).applyQuaternion(humanTorso.clone().invert())
+            .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(humanFore,direction));
+          const reference=new THREE.Vector3(-arm.side,0,0);
+          reference.addScaledVector(direction,-reference.dot(direction)).normalize();
+          tracked.addScaledVector(direction,-tracked.dot(direction));
+          if(tracked.lengthSq()>.05 && reference.lengthSq()>.05){
+            tracked.normalize();
+            const roll=Math.atan2(direction.dot(reference.clone().cross(tracked)),reference.dot(tracked));
+            target+=clamp(roll,1.3)*raised;
+          }
+        }
+        const current = this.armSurface.turn.value.getComponent(i);
+        this.armSurface.turn.value.setComponent(i, current + (target-current)*k);
+        this.armSurface.spread.value.setComponent(i, .20*raised);
+      }
       // 떼어 낸 팔 부품: 들수록 가늘게 (위팔 방향의 y 로 든 정도 — 내린 팔 ≈ -0.8, 다 든 팔 ≈ +0.6)
       for (const sl of this.armSlim) {
         if (sl.side !== arm.side) continue;
@@ -1154,11 +1188,12 @@ export class PuuvillaCharacter implements CharacterRig {
     const theta = Math.acos(clamp(-tu.y, 1));
     let phi = Math.atan2(tu.z, arm.side * tu.x);
     phi = Math.min(2.0, Math.max(-0.5, phi)) * smooth(0.25, 0.7, theta);
-    // 몸에 붙은 팔(원본 메쉬): 바인드가 가장 내린 자세라 [rest, π] 로 눌러 맞춤. 자유 팔: 사람 각 그대로
+    // Connected standing arms keep a small body-clearance angle when lowered.
+    // Above horizontal they follow the measured direction without compression.
     const theta2 = this.armsFree
       ? Math.min(this.cfg.character.freeArmRaiseMaxRad, theta)
       : this.connectedArms
-        ? Math.min(this.cfg.body.armRaiseMaxRad, theta + arm.restPolar * (1 - smooth(0, Math.PI / 2, theta)))
+        ? Math.min(this.cfg.body.armRaiseMaxRad, theta + .43 * (1 - smooth(0, Math.PI / 2, theta)))
       : Math.min(this.cfg.body.armRaiseMaxRad, arm.restPolar + (theta * (Math.PI - arm.restPolar)) / Math.PI);
     const d = polarDir(arm.side, theta2, phi);
     outU.setFromUnitVectors(arm.restUpper, d);
