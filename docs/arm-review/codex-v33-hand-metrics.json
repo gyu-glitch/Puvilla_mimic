@@ -1,0 +1,41 @@
+{
+  "rows": [
+    {
+      "fps": 15,
+      "mirror": true,
+      "beforeAcrossDifferenceDegrees": 52.125016348901774,
+      "afterAcrossDifferenceDegrees": 0
+    },
+    {
+      "fps": 30,
+      "mirror": true,
+      "beforeAcrossDifferenceDegrees": 52.125016348901774,
+      "afterAcrossDifferenceDegrees": 0
+    },
+    {
+      "fps": 60,
+      "mirror": true,
+      "beforeAcrossDifferenceDegrees": 52.12501634890178,
+      "afterAcrossDifferenceDegrees": 0
+    },
+    {
+      "fps": 15,
+      "mirror": false,
+      "beforeAcrossDifferenceDegrees": 52.125016348901774,
+      "afterAcrossDifferenceDegrees": 0
+    },
+    {
+      "fps": 30,
+      "mirror": false,
+      "beforeAcrossDifferenceDegrees": 52.125016348901774,
+      "afterAcrossDifferenceDegrees": 0
+    },
+    {
+      "fps": 60,
+      "mirror": false,
+      "beforeAcrossDifferenceDegrees": 52.12501634890178,
+      "afterAcrossDifferenceDegrees": 0
+    }
+  ],
+  "realTurnsAndMissingReference": "pass"
+}

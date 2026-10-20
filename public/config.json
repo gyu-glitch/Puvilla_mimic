@@ -186,6 +186,7 @@
     "armPawContact": false,
     "armElbowPlane": true,
     "armPawFrame": true,
+    "armImagePalm": true,
     "armFollowPose": true
   },
   "scene": {

@@ -273,6 +273,8 @@ export interface Config {
     /** Cage bend distribution; .32 is the original narrow curve. */
     armBendSpread?: number;
     armPawFrame?: boolean;
+    /** Camera-plane palms; excludes unreliable Pose hand-depth rotation. */
+    armImagePalm?: boolean;
     armFollowPose?: boolean;
     armDeform?: 'surface' | 'cage';
     armCageRounded?: boolean;
@@ -589,6 +591,7 @@ export const DEFAULT_CONFIG: Config = {
     armPawContact: false,
     armElbowPlane: true,
     armPawFrame: true,
+    armImagePalm: true,
     armFollowPose: true,
   },
   scene: {

@@ -1,0 +1,91 @@
+{
+  "scope": "Camera-plane greeting. Real palm/back depth turns deliberately omitted; image-plane wrist direction preserved.",
+  "rows": [
+    {
+      "mirror": true,
+      "fps": 15,
+      "oneHand": false,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": true,
+      "fps": 15,
+      "oneHand": true,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": true,
+      "fps": 30,
+      "oneHand": false,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": true,
+      "fps": 30,
+      "oneHand": true,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": true,
+      "fps": 60,
+      "oneHand": false,
+      "beforeDegrees": 52.12501634890178,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": true,
+      "fps": 60,
+      "oneHand": true,
+      "beforeDegrees": 52.12501634890178,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 15,
+      "oneHand": false,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 15,
+      "oneHand": true,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 30,
+      "oneHand": false,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 30,
+      "oneHand": true,
+      "beforeDegrees": 52.125016348901774,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 60,
+      "oneHand": false,
+      "beforeDegrees": 52.12501634890178,
+      "afterDegrees": 0
+    },
+    {
+      "mirror": false,
+      "fps": 60,
+      "oneHand": true,
+      "beforeDegrees": 52.12501634890178,
+      "afterDegrees": 0
+    }
+  ],
+  "missingAndCollapsed": "pass",
+  "imageWristTurnDegrees": 20.05352282957881
+}

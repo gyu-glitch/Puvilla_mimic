@@ -3,6 +3,7 @@ import type { RawPose } from "./poseTracker";
 import { OneEuroBank } from "./smoothing";
 import { Vector3 } from "three";
 import { alignedCameraArm } from "./armImageAlignment";
+import {imagePalm} from "./imagePalm";
 
 export type V3 = [number, number, number];
 
@@ -216,6 +217,15 @@ export class BodyProcessor {
       // MediaPipe Pose: left pinky/index 17/19, right pinky/index 18/20.
       const right = side[s][0] === LM.rShoulder;
       const pinky=right?18:17, index=right?20:19;
+      if(this.cfg.body.armImagePalm){
+        if(armConfidence[s]<this.cfg.body.minVisibility)continue;
+        const palm=imagePalm(raw,side[s][2],index,pinky,mirror,Math.max(.65,this.cfg.body.minVisibility));
+        if(palm){
+          hands[`handAcross${s}`]=palm.across.toArray().map((v,i)=>this.bank.filter(`handAcross${s}${i}`,v,t)) as V3;
+          hands[`handDirection${s}`]=palm.forward.toArray().map((v,i)=>this.bank.filter(`handDirection${s}${i}`,v,t)) as V3;
+        }
+        continue;
+      }
       if(Math.min(vis(pinky),vis(index),vis(side[s][2]),armConfidence[s]) < Math.max(.6,this.cfg.body.minVisibility))continue;
       const a=pick(index),b=pick(pinky),span=a.map((v,i)=>v-b[i]) as V3;
       const length=Math.hypot(...span);

@@ -134,6 +134,8 @@ assert.equal(BodyProcessor.pickForFace([other,nearest],{cx:.5,cy:.3,h:.2}),neare
 const handRaw=raw();
 Object.assign(handRaw.world[17],{x:.53,y:-.62,z:-.2});
 Object.assign(handRaw.world[19],{x:.47,y:-.62,z:-.2});
+handRaw.imageAspect=1;
+handRaw.image=handRaw.world.map(p=>({x:.5+p.x*.5,y:.8+p.y*.5}));
 const handProcessor=new BodyProcessor(cfg);
 handProcessor.update(handRaw,true,800);handProcessor.update(handRaw,true,900);
 const hand=handProcessor.update(handRaw,true,1000);
@@ -144,6 +146,7 @@ assert.equal(handProcessor.update(handRaw,true,1100).handAcrossR,undefined);
 assert.equal(handProcessor.update(handRaw,true,1100).handDirectionR,undefined);
 assert.ok(handProcessor.update(handRaw,true,1100).armR>=cfg.body.minVisibility,'bad palm discarded a valid arm');
 handRaw.world[19].visibility=1;Object.assign(handRaw.world[19],handRaw.world[17]);
+handRaw.image[19]={...handRaw.image[17]};
 assert.equal(handProcessor.update(handRaw,true,1200).handAcrossR,undefined);
 const {standingWavePose}=await import('../src/standingWave.ts');
 const start=standingWavePose(0,0),wave=standingWavePose(0);

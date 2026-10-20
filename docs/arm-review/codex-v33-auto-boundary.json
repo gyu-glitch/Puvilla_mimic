@@ -1,0 +1,55 @@
+{
+  "status": "Unfixed automatic front-palm boundary. Not proven to be the user camera fault.",
+  "rows": [
+    {
+      "side": -1,
+      "az": 0,
+      "jumpDegrees": -78.8460436456275
+    },
+    {
+      "side": -1,
+      "az": 0.5,
+      "jumpDegrees": -53.28592948828177
+    },
+    {
+      "side": -1,
+      "az": 1,
+      "jumpDegrees": -29.5743055784999
+    },
+    {
+      "side": -1,
+      "az": 1.5,
+      "jumpDegrees": -6.6684369318816215
+    },
+    {
+      "side": -1,
+      "az": 2,
+      "jumpDegrees": 16.476617851642754
+    },
+    {
+      "side": 1,
+      "az": 0,
+      "jumpDegrees": 78.8460436456275
+    },
+    {
+      "side": 1,
+      "az": 0.5,
+      "jumpDegrees": 53.28592948828177
+    },
+    {
+      "side": 1,
+      "az": 1,
+      "jumpDegrees": 29.5743055784999
+    },
+    {
+      "side": 1,
+      "az": 1.5,
+      "jumpDegrees": 6.6684369318816215
+    },
+    {
+      "side": 1,
+      "az": 2,
+      "jumpDegrees": -16.476617851642754
+    }
+  ]
+}

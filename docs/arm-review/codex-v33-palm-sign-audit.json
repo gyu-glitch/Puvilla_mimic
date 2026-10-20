@@ -1,0 +1,727 @@
+{
+  "scope": "BodyProcessor -> solveArm -> front frame -> observed palm -> v31 rejection. Symmetric controlled input, not measured camera data.",
+  "samples": 60,
+  "maxMirrorVectorError": 1.5548697241856944e-15,
+  "rows": [
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -55.73645185736064,
+      "rightRollDegrees": 55.73645185736065,
+      "accepted": [
+        -55.73645185736064,
+        55.73645185736065
+      ],
+      "mirrorVectorError": 7.850462293418876e-16
+    },
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -32.81554531519358,
+      "rightRollDegrees": 32.81554531519359,
+      "accepted": [
+        -32.81554531519358,
+        32.815545315193596
+      ],
+      "mirrorVectorError": 9.019494489765868e-16
+    },
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.2228363672535255e-14,
+      "rightRollDegrees": -1.0241826024284501e-14,
+      "accepted": [
+        1.2228363672535255e-14,
+        -1.0241826024284501e-14
+      ],
+      "mirrorVectorError": 1.1165368122018449e-15
+    },
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.81554531519362,
+      "rightRollDegrees": -32.815545315193596,
+      "accepted": [
+        32.81554531519362,
+        -32.815545315193596
+      ],
+      "mirrorVectorError": 1.1157603309187458e-15
+    },
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 55.73645185736068,
+      "rightRollDegrees": -55.73645185736067,
+      "accepted": [
+        55.73645185736068,
+        -55.73645185736067
+      ],
+      "mirrorVectorError": 6.080941944488118e-16
+    },
+    {
+      "mirror": true,
+      "time": 3,
+      "turnDegrees": 180,
+      "leftRollDegrees": -180,
+      "rightRollDegrees": 180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 1.1106620397052277e-15
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -57.11103837401448,
+      "rightRollDegrees": 57.1110383740145,
+      "accepted": [
+        -57.11103837401448,
+        57.1110383740145
+      ],
+      "mirrorVectorError": 7.34474626806716e-16
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.18862750116345,
+      "rightRollDegrees": 34.18862750116347,
+      "accepted": [
+        -34.18862750116345,
+        34.18862750116347
+      ],
+      "mirrorVectorError": 1.0235750533041806e-15
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.1951058802209577e-14,
+      "rightRollDegrees": -1.0241826024284501e-14,
+      "accepted": [
+        1.1951058802209577e-14,
+        -1.0241826024284501e-14
+      ],
+      "mirrorVectorError": 1.3328141360548813e-15
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 34.18862750116349,
+      "rightRollDegrees": -34.188627501163474,
+      "accepted": [
+        34.18862750116349,
+        -34.188627501163474
+      ],
+      "mirrorVectorError": 1.2851760658783268e-15
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 57.111038374014505,
+      "rightRollDegrees": -57.111038374014505,
+      "accepted": [
+        57.11103837401451,
+        -57.111038374014505
+      ],
+      "mirrorVectorError": 7.108895957933346e-16
+    },
+    {
+      "mirror": true,
+      "time": 5,
+      "turnDegrees": 180,
+      "leftRollDegrees": -180,
+      "rightRollDegrees": -180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 1.5548697241856944e-15
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -59.05100049234307,
+      "rightRollDegrees": 59.05100049234305,
+      "accepted": [
+        -59.05100049234307,
+        59.05100049234305
+      ],
+      "mirrorVectorError": 1.164783901589769e-15
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.7176783133262,
+      "rightRollDegrees": 34.71767831332617,
+      "accepted": [
+        -34.7176783133262,
+        34.71767831332617
+      ],
+      "mirrorVectorError": 1.0175362097255202e-15
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": 0,
+      "leftRollDegrees": -1.859446073197247e-15,
+      "rightRollDegrees": -2.1292636847653868e-14,
+      "accepted": [
+        -1.859446073197247e-15,
+        -2.1292636847653868e-14
+      ],
+      "mirrorVectorError": 4.1004107616799284e-16
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.56624117345488,
+      "rightRollDegrees": -32.566241173454905,
+      "accepted": [
+        32.56624117345488,
+        -32.566241173454905
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 54.16671914942366,
+      "rightRollDegrees": -54.16671914942369,
+      "accepted": [
+        54.16671914942366,
+        -54.166719149423685
+      ],
+      "mirrorVectorError": 6.77599954797753e-16
+    },
+    {
+      "mirror": true,
+      "time": 6,
+      "turnDegrees": 180,
+      "leftRollDegrees": 180,
+      "rightRollDegrees": 179.99999999999997,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.583568822392523e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -63.459850792047796,
+      "rightRollDegrees": 63.45985079204778,
+      "accepted": [
+        -63.459850792047796,
+        63.45985079204778
+      ],
+      "mirrorVectorError": 2.420669712248692e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -35.95330901471939,
+      "rightRollDegrees": 35.953309014719395,
+      "accepted": [
+        -35.95330901471939,
+        35.953309014719395
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.0069114901213388e-14,
+      "rightRollDegrees": -1.4601467480819304e-14,
+      "accepted": [
+        1.0069114901213388e-14,
+        -1.4601467480819304e-14
+      ],
+      "mirrorVectorError": 7.243088545993919e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 29.639045340820477,
+      "rightRollDegrees": -29.639045340820495,
+      "accepted": [
+        29.639045340820477,
+        -29.639045340820495
+      ],
+      "mirrorVectorError": 8.688869536365456e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 48.70903502946968,
+      "rightRollDegrees": -48.70903502946971,
+      "accepted": [
+        48.70903502946968,
+        -48.70903502946971
+      ],
+      "mirrorVectorError": 5.087681048627601e-16
+    },
+    {
+      "mirror": true,
+      "time": 8,
+      "turnDegrees": 180,
+      "leftRollDegrees": -180,
+      "rightRollDegrees": 180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.537095754439795e-16
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -59.05100049234307,
+      "rightRollDegrees": 59.05100049234305,
+      "accepted": [
+        -59.05100049234307,
+        59.05100049234305
+      ],
+      "mirrorVectorError": 1.164783901589769e-15
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.7176783133262,
+      "rightRollDegrees": 34.71767831332617,
+      "accepted": [
+        -34.7176783133262,
+        34.71767831332617
+      ],
+      "mirrorVectorError": 1.0175362097255202e-15
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": 0,
+      "leftRollDegrees": -1.859446073197247e-15,
+      "rightRollDegrees": -2.1292636847653868e-14,
+      "accepted": [
+        -1.859446073197247e-15,
+        -2.1292636847653868e-14
+      ],
+      "mirrorVectorError": 4.1004107616799284e-16
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.56624117345488,
+      "rightRollDegrees": -32.566241173454905,
+      "accepted": [
+        32.56624117345488,
+        -32.566241173454905
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 54.16671914942366,
+      "rightRollDegrees": -54.16671914942369,
+      "accepted": [
+        54.16671914942366,
+        -54.166719149423685
+      ],
+      "mirrorVectorError": 6.77599954797753e-16
+    },
+    {
+      "mirror": true,
+      "time": 11,
+      "turnDegrees": 180,
+      "leftRollDegrees": 180,
+      "rightRollDegrees": 179.99999999999997,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.583568822392523e-16
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -55.73645185736065,
+      "rightRollDegrees": 55.73645185736064,
+      "accepted": [
+        -55.73645185736065,
+        55.73645185736064
+      ],
+      "mirrorVectorError": 7.850462293418876e-16
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -32.81554531519359,
+      "rightRollDegrees": 32.81554531519358,
+      "accepted": [
+        -32.815545315193596,
+        32.81554531519358
+      ],
+      "mirrorVectorError": 9.019494489765868e-16
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.0241826024284501e-14,
+      "rightRollDegrees": -1.2228363672535255e-14,
+      "accepted": [
+        1.0241826024284501e-14,
+        -1.2228363672535255e-14
+      ],
+      "mirrorVectorError": 1.1165368122018449e-15
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.815545315193596,
+      "rightRollDegrees": -32.81554531519362,
+      "accepted": [
+        32.815545315193596,
+        -32.81554531519362
+      ],
+      "mirrorVectorError": 1.1157603309187458e-15
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 55.73645185736067,
+      "rightRollDegrees": -55.73645185736068,
+      "accepted": [
+        55.73645185736067,
+        -55.73645185736068
+      ],
+      "mirrorVectorError": 6.080941944488118e-16
+    },
+    {
+      "mirror": false,
+      "time": 3,
+      "turnDegrees": 180,
+      "leftRollDegrees": -180,
+      "rightRollDegrees": 180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 1.1106620397052277e-15
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -57.1110383740145,
+      "rightRollDegrees": 57.11103837401448,
+      "accepted": [
+        -57.1110383740145,
+        57.11103837401448
+      ],
+      "mirrorVectorError": 7.34474626806716e-16
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.18862750116347,
+      "rightRollDegrees": 34.18862750116345,
+      "accepted": [
+        -34.18862750116347,
+        34.18862750116345
+      ],
+      "mirrorVectorError": 1.0235750533041806e-15
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.0241826024284501e-14,
+      "rightRollDegrees": -1.1951058802209577e-14,
+      "accepted": [
+        1.0241826024284501e-14,
+        -1.1951058802209577e-14
+      ],
+      "mirrorVectorError": 1.3328141360548813e-15
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 34.188627501163474,
+      "rightRollDegrees": -34.18862750116349,
+      "accepted": [
+        34.188627501163474,
+        -34.18862750116349
+      ],
+      "mirrorVectorError": 1.2851760658783268e-15
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 57.111038374014505,
+      "rightRollDegrees": -57.111038374014505,
+      "accepted": [
+        57.111038374014505,
+        -57.11103837401451
+      ],
+      "mirrorVectorError": 7.108895957933346e-16
+    },
+    {
+      "mirror": false,
+      "time": 5,
+      "turnDegrees": 180,
+      "leftRollDegrees": 180,
+      "rightRollDegrees": 180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 1.5548697241856944e-15
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -59.05100049234305,
+      "rightRollDegrees": 59.05100049234307,
+      "accepted": [
+        -59.05100049234305,
+        59.05100049234307
+      ],
+      "mirrorVectorError": 1.164783901589769e-15
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.71767831332617,
+      "rightRollDegrees": 34.7176783133262,
+      "accepted": [
+        -34.71767831332617,
+        34.7176783133262
+      ],
+      "mirrorVectorError": 1.0175362097255202e-15
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": 0,
+      "leftRollDegrees": 2.1292636847653868e-14,
+      "rightRollDegrees": 1.859446073197247e-15,
+      "accepted": [
+        2.1292636847653868e-14,
+        1.859446073197247e-15
+      ],
+      "mirrorVectorError": 4.1004107616799284e-16
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.566241173454905,
+      "rightRollDegrees": -32.56624117345488,
+      "accepted": [
+        32.566241173454905,
+        -32.56624117345488
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 54.16671914942369,
+      "rightRollDegrees": -54.16671914942366,
+      "accepted": [
+        54.166719149423685,
+        -54.16671914942366
+      ],
+      "mirrorVectorError": 6.77599954797753e-16
+    },
+    {
+      "mirror": false,
+      "time": 6,
+      "turnDegrees": 180,
+      "leftRollDegrees": -179.99999999999997,
+      "rightRollDegrees": -180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.583568822392523e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -63.45985079204778,
+      "rightRollDegrees": 63.459850792047796,
+      "accepted": [
+        -63.45985079204778,
+        63.459850792047796
+      ],
+      "mirrorVectorError": 2.420669712248692e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -35.953309014719395,
+      "rightRollDegrees": 35.95330901471939,
+      "accepted": [
+        -35.953309014719395,
+        35.95330901471939
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": 0,
+      "leftRollDegrees": 1.4601467480819304e-14,
+      "rightRollDegrees": -1.0069114901213388e-14,
+      "accepted": [
+        1.4601467480819304e-14,
+        -1.0069114901213388e-14
+      ],
+      "mirrorVectorError": 7.243088545993919e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 29.639045340820495,
+      "rightRollDegrees": -29.639045340820477,
+      "accepted": [
+        29.639045340820495,
+        -29.639045340820477
+      ],
+      "mirrorVectorError": 8.688869536365456e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 48.70903502946971,
+      "rightRollDegrees": -48.70903502946968,
+      "accepted": [
+        48.70903502946971,
+        -48.70903502946968
+      ],
+      "mirrorVectorError": 5.087681048627601e-16
+    },
+    {
+      "mirror": false,
+      "time": 8,
+      "turnDegrees": 180,
+      "leftRollDegrees": -180,
+      "rightRollDegrees": 180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.537095754439795e-16
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": -57.29577951308232,
+      "leftRollDegrees": -59.05100049234305,
+      "rightRollDegrees": 59.05100049234307,
+      "accepted": [
+        -59.05100049234305,
+        59.05100049234307
+      ],
+      "mirrorVectorError": 1.164783901589769e-15
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": -34.37746770784939,
+      "leftRollDegrees": -34.71767831332617,
+      "rightRollDegrees": 34.7176783133262,
+      "accepted": [
+        -34.71767831332617,
+        34.7176783133262
+      ],
+      "mirrorVectorError": 1.0175362097255202e-15
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": 0,
+      "leftRollDegrees": 2.1292636847653868e-14,
+      "rightRollDegrees": 1.859446073197247e-15,
+      "accepted": [
+        2.1292636847653868e-14,
+        1.859446073197247e-15
+      ],
+      "mirrorVectorError": 4.1004107616799284e-16
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": 34.37746770784939,
+      "leftRollDegrees": 32.566241173454905,
+      "rightRollDegrees": -32.56624117345488,
+      "accepted": [
+        32.566241173454905,
+        -32.56624117345488
+      ],
+      "mirrorVectorError": 5.438959822042073e-16
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": 57.29577951308232,
+      "leftRollDegrees": 54.16671914942369,
+      "rightRollDegrees": -54.16671914942366,
+      "accepted": [
+        54.166719149423685,
+        -54.16671914942366
+      ],
+      "mirrorVectorError": 6.77599954797753e-16
+    },
+    {
+      "mirror": false,
+      "time": 11,
+      "turnDegrees": 180,
+      "leftRollDegrees": -179.99999999999997,
+      "rightRollDegrees": -180,
+      "accepted": [
+        0,
+        0
+      ],
+      "mirrorVectorError": 8.583568822392523e-16
+    }
+  ]
+}
