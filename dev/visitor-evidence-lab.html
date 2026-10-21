@@ -1,0 +1,54 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8"><title>얼굴 없는 가짜 몸 검출 차단</title>
+<style>body{margin:0;color:white;font:14px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}button{font:inherit}#status{margin-top:8px}</style>
+</head><body><div id="app"></div><nav>0–2초 실제 얼굴 · 이후 얼굴 없이 몸 추정만 반복
+<button id="before">수정 전</button><button id="after">수정 후</button>
+<select id="view"><option value="0">정면</option><option value="-45">사선</option><option value="-90">측면</option></select>
+<button id="record">10초 영상 저장</button><button id="up">+15° 정지</button><button id="down">−15° 정지</button>
+<div id="status">로딩 중</div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';
+import {Scene} from '/src/scene.ts';
+import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';
+import {mapSignal,NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {BodyProcessor} from '/src/body.ts';
+import {BodyTargetLock} from '/src/bodyTarget.ts';
+import {armSessionFixture} from '/dev/arm-session-fixture.ts';
+import {SignalProcessor} from '/src/signals.ts';
+import {FaceNeutral as Before} from '/dev/face-neutral-before-v47.ts';
+import {MimicStateMachine} from '/src/state.ts';
+const cfg=await loadConfig();cfg.presence.mimicOnLock=true;cfg.scene.outputMirror=false;cfg.scene.layout='landscape';cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter);
+const backdrop=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});await backdrop.set('winter',false);scene.backdrop=backdrop;
+const ch=await PuuvillaCharacter.load(cfg);scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let lock;let corrected=true,processor,old,fsm,bodyProc,start,last=performance.now(),freeze=null;
+function reset(){lock=new BodyTargetLock(cfg);processor=new SignalProcessor(cfg);old=new Before();fsm=new MimicStateMachine(cfg);bodyProc=new BodyProcessor(cfg);start=performance.now();freeze=null;}
+reset();
+for(const [id,fixed] of [['before',false],['after',true]])document.querySelector('#'+id).onclick=()=>{corrected=fixed;reset();};
+document.querySelector('#view').onchange=e=>{ch.root.rotation.y=Number(e.target.value)*Math.PI/180;};
+document.querySelector('#up').onclick=()=>{reset();for(let i=0;i<120;i++)inputs(i/60,start-2000+i*1000/60);freeze=3;};
+document.querySelector('#down').onclick=()=>{reset();for(let i=0;i<120;i++)inputs(i/60,start-2000+i*1000/60);freeze=5;};
+function inputs(t,now){
+ const pose=armSessionFixture(t<2?t:3,true).raw;
+ const selected=lock.update([pose],null,true,now),hint=lock.headHint(now);
+ const raw={bbox:{x:pose.nose.x-.04,y:pose.nose.y-.06,w:.08,h:.12,cx:pose.nose.x,cy:pose.nose.y},yaw:0,pitch:0,roll:0,blend:{},mouth:{open:.1,corner:.02},eyes:{left:.25,right:.25}};
+ const track={faces:t<2?[raw]:[],inferenceMs:1,observedAtMs:now};lock.observeFace(track,now);
+ const sig=processor.update(track,now,pose.imageAspect,hint),bp=bodyProc.update(selected,true,now);
+ const confirmed=corrected?lock.confirmed(now):!!hint;
+ const state=fsm.update(sig,now,confirmed);const body=confirmed?bp:null;
+ return {sig,body,state,motion:confirmed?1:0};
+}
+document.querySelector('#record').onclick=()=>{
+ reset();const chunks=[],stream=scene.renderer.domElement.captureStream(24),recorder=new MediaRecorder(stream,{mimeType:'video/webm'});
+ recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+ recorder.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`codex-v49-empty-${corrected?'after':'before'}-${document.querySelector('#view').value}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);stream.getTracks().forEach(t=>t.stop());};recorder.start();setTimeout(()=>recorder.stop(),10000);
+};
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;const t=freeze??Math.min(9.99,(now-start)/1000);
+ const {sig,body,state,motion}=inputs(t,now);
+ const params=state.state==='MIMIC'||state.state==='ENTER'?mapSignal(sig,cfg.mapping):NEUTRAL_PARAMS;
+ ch.setState(state);ch.apply(params,dt,now/1000,body);scene.render();
+ document.querySelector('#status').textContent=`${corrected?'수정 후':'수정 전'} | ${t.toFixed(2)}초 | ${state.state} | 실제 얼굴 ${t<2} | 몸 미믹 허용 ${!!motion}`;
+ requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+</script></body></html>

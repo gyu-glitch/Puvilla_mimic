@@ -234,12 +234,15 @@ async function main(): Promise<void> {
     } else body = null;
     const hint = bodyTarget.headHint(now);
     const track = tracker ? tracker.update(video, now, input, hint) : { faces: [], inferenceMs: 0 };
+    bodyTarget.observeFace(track, now);
+    const confirmedBody = sim ? body !== null : cfg.presence.mimicOnLock ? bodyTarget.confirmed(now) : body !== null;
+    if (!sim && cfg.presence.mimicOnLock && !confirmedBody) body = null;
     if (track.observedAtMs !== undefined && track.observedAtMs !== lastInferMs) {
       inferFrames++;
       lastInferMs = track.observedAtMs;
     }
     sig = sim ? sim.update(dt) : signals.update(track, now, cameraInput!.canvas.width / cameraInput!.canvas.height, hint);
-    snap = fsm.update(sig, now, hint!==null || body!==null);
+    snap = fsm.update(sig, now, confirmedBody);
 
     const params = snap.state === "MIMIC" || snap.state === "ENTER" ? mapSignal(sig, cfg.mapping) : NEUTRAL_PARAMS;
     character.setState(snap);
