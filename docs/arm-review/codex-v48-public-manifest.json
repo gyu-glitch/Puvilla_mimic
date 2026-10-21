@@ -1,0 +1,258 @@
+[
+  {
+    "file": "config.json",
+    "sha256": "55CF0E43A043D2266F8727B97A08EA8080DB22464F024767FF63F5F3DBCC7F1F"
+  },
+  {
+    "file": "config.json.gz",
+    "sha256": "680F05BAE1E6FB18E4AAC604D8510B6D8B62D8465CCE79AECA9D460C8B2EB000"
+  },
+  {
+    "file": "index.html",
+    "sha256": "0B2AE813148009CDA082DAD0A0912D5D744CBB02C1D578E9D6BE7CED25659289"
+  },
+  {
+    "file": "index.html.gz",
+    "sha256": "109EF83F3C632D6F40A2CCAD65B40941CF54DEEB620AEA9D75A4A74434940DDD"
+  },
+  {
+    "file": "manifest.webmanifest",
+    "sha256": "8B9D3CB0E83EAD3AE5CEC062018D2F7B91A7E54C1AB2D0FE9F154843C68B46AA"
+  },
+  {
+    "file": "assets\\index-CkFn6ZSg.js",
+    "sha256": "3D04369F57C850ED1F705B6F0C5E8BAB08E594FAAC48A2FDC4BEB1DF3A42D945"
+  },
+  {
+    "file": "assets\\index-CkFn6ZSg.js.gz",
+    "sha256": "2333F64B5C66514EDC6616E8DA5C1E64708301430D8AFE0584CD42E8C3DA9787"
+  },
+  {
+    "file": "assets\\poseWorker-DG4MOHX1.js",
+    "sha256": "95CCCBBC0664103035E4FAB4F382823B5C1C6BE87B57AC37F9ACDAC5FAAE5BF5"
+  },
+  {
+    "file": "assets\\poseWorker-DG4MOHX1.js.gz",
+    "sha256": "F78658E9636B226E4586912848DDA0F06A376975B20C9EAE87743AD4360832CA"
+  },
+  {
+    "file": "assets\\trackerWorker-Cp4JYC00.js",
+    "sha256": "F2A80454EA3FF3875EE3DCA7960DFC54660B975688FE90194D79E3A6EE0300D6"
+  },
+  {
+    "file": "assets\\trackerWorker-Cp4JYC00.js.gz",
+    "sha256": "E338C01798C521E001AB6651B3F55F79487EB74BE167386DBBFED1F25853E762"
+  },
+  {
+    "file": "bg\\bg_far.webp",
+    "sha256": "2A9E11BCF8032A866D23437B28245D1F63EC41A07D424D22B1CBB36379F7EE4F"
+  },
+  {
+    "file": "bg\\branches_left.webp",
+    "sha256": "57D089CEC730E182A4593AF9D05C339747D3503BD0ADD9727F528715B3740B09"
+  },
+  {
+    "file": "bg\\branches_right.webp",
+    "sha256": "32E29F793C37BF5BC6CEC444D3CE35B742D831DDAF9EC4A75E37807DEDBB672F"
+  },
+  {
+    "file": "bg\\village_left.webp",
+    "sha256": "ECF2223A16A586E0B45D6AA36E5E8114AFB0CDB7B0BB10C07054CA97194B0C28"
+  },
+  {
+    "file": "bg\\village_right.webp",
+    "sha256": "C3BB966128BE055167504BFF9A0741C5514BCE76A3F118C223B85B15D6EE0C97"
+  },
+  {
+    "file": "icons\\apple-touch-icon.png",
+    "sha256": "F1E2B199D0FDBBFFBC7A31F9D07DDB9943937CC1B758B3ACD98979FE9B51F6D5"
+  },
+  {
+    "file": "icons\\icon-192.png",
+    "sha256": "388F2CE661AE450A7C43589F6CADF7325D85ED816D3963173EDA2CD895F8BCD7"
+  },
+  {
+    "file": "icons\\icon-512.png",
+    "sha256": "52583603C61114C30F587BF619D592A58EEC97BA2630F8C68EDAA3591C376D94"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_internal.js",
+    "sha256": "7C652617B5BEF832F42878CE8C5F752B0724BCA6054E4BC1013A37D4B1949723"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_internal.js.gz",
+    "sha256": "F66AD17F41E4FD33B4E05C350DC967B8CFB39D062460C2896F8426965D65E245"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_internal.wasm",
+    "sha256": "782EDA3EC1F414FDB4F1D66A8B59093EB4D5AB437E06117796ABF05962D68EEF"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_internal.wasm.gz",
+    "sha256": "EDB65B0E31EDDC05C2F85166526DA1E600489266065CC6E2479DBABFD3501225"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_module_internal.js",
+    "sha256": "70EFF3956521B7DE058D7173A4935C95E4A223C26EA624B9F5A936D3A043DCB0"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_module_internal.js.gz",
+    "sha256": "E5641DEC6655927EA88E0E3480F4E43451BD76DFD1224C750E64E4C86D7C3A3B"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_module_internal.wasm",
+    "sha256": "EE03B14A878E6C3C053A1BFA62E166DC45244BE54DC0BBE61C578F710B771F6A"
+  },
+  {
+    "file": "mediapipe\\wasm\\vision_wasm_module_internal.wasm.gz",
+    "sha256": "D2242201511911499A3C2848D91D40D37EBC8F7428AF95D41F4878C83DE29132"
+  },
+  {
+    "file": "models\\face_landmarker.task",
+    "sha256": "64184E229B263107BC2B804C6625DB1341FF2BB731874B0BCC2FE6544E0BC9FF"
+  },
+  {
+    "file": "models\\muffler_color.jpg",
+    "sha256": "0E1D917E6188908B864BC18FCD5216D6A40EB13BA49F01CB1389B87CF1F16207"
+  },
+  {
+    "file": "models\\muffler_fit.bin",
+    "sha256": "D1B64CDE6D7457B524C103848E5C9CC4B15C6E9C205BD7D03F2030E6B3095496"
+  },
+  {
+    "file": "models\\muffler_fit.bin.gz",
+    "sha256": "90A3D0695218A1E255BC304922F7067075F748D08802CB4DA3F018FB71379738"
+  },
+  {
+    "file": "models\\muffler_seat.bin",
+    "sha256": "15A35960A1DC71C382EAB19D7EC3EAB29C56C8894850089D73F040113BA6A02F"
+  },
+  {
+    "file": "models\\muffler_seat.bin.gz",
+    "sha256": "4BB435042FB8DFC275B8ACF7A39ED0FA0DD43161C9F197373C37708DC56DD9E7"
+  },
+  {
+    "file": "models\\muffler_sit.bin",
+    "sha256": "D8887EADF9F7651399EA23E144BFAA3EF7B5EB7FBA660173FDB1D6A9246B3A9A"
+  },
+  {
+    "file": "models\\muffler_sit.bin.gz",
+    "sha256": "31AEC47879E51720C338C1E215C74792BCE7B2436F72EF3D4F2B72B6B70B0D08"
+  },
+  {
+    "file": "models\\muffler.bin",
+    "sha256": "FB3B2B14455B08F107219FF8EECBF4448C1AC0ACCB407502EA0AEA6F50C88B2B"
+  },
+  {
+    "file": "models\\muffler.bin.gz",
+    "sha256": "2500F646ED92D2D0CBB1F6488224E67C27CBCA1E45DCDE634E048E45E14FF57B"
+  },
+  {
+    "file": "models\\parts_seat.glb",
+    "sha256": "C4841103A3011643560E8A409325E64F8A608427BE71B560C4271AA4355A9654"
+  },
+  {
+    "file": "models\\pose_landmarker_full.task",
+    "sha256": "5134A3AAD27A58B93DA0088D431F366DA362B44E3CCFBE3462B3827A839011B1"
+  },
+  {
+    "file": "models\\pu_sit.obj",
+    "sha256": "CFC374A33ADAD3167B9DD34DCA5FB9AE2893D09C0C48321F2747A8AC3B45FB1B"
+  },
+  {
+    "file": "models\\pu_sit.obj.gz",
+    "sha256": "97DC1EE4BD54A948630AC9B351D21770F0F59D763554AE61AE811DADF016C1D2"
+  },
+  {
+    "file": "models\\pu_stand_arm.json",
+    "sha256": "04950DF991CF282047D23F207782B5E91514837E6A9B5A5A6FCF025674CE6C8C"
+  },
+  {
+    "file": "models\\pu_stand_arm.obj",
+    "sha256": "F0E095E4D0DC8DFBF4AF6580A1BA52505F3CECB6F61DF7D0008F1EF57B520269"
+  },
+  {
+    "file": "models\\pu_stand_arm.obj.gz",
+    "sha256": "8A7CD82BC3A803A49BF4AB0157EB2D7430CB325EFEFFCB98690A48DEE9A435BD"
+  },
+  {
+    "file": "models\\pu_stand.obj",
+    "sha256": "18EE1AACBD91B86A87D7FC05576B563CA2B1DC79534DA92C02B9A50E288F7AEF"
+  },
+  {
+    "file": "models\\pu_stand.obj.gz",
+    "sha256": "AFF29F6459F420FC9D923971689733C86ADE41F3D21E7D3614F0F2B179D7A166"
+  },
+  {
+    "file": "models\\README.md",
+    "sha256": "4CB4D62D83475D72A60AC9428A4BD3C3E9EDABDAA5338544AB4620CCDEE39D27"
+  },
+  {
+    "file": "models\\seat_a.glb",
+    "sha256": "4F40B08B197F8E110A458FE46ADE513915A63D2378997372C2D1CB9915B32EA4"
+  },
+  {
+    "file": "models\\seat_t.bin",
+    "sha256": "9C08F65B2EDE1462472F46F84BCCD47D26401C1EB6C4EE198A538A177BE75F7A"
+  },
+  {
+    "file": "models\\seat_t.bin.gz",
+    "sha256": "5EA7BAE93B8FB3F9D3500B81A5A847D404AD17383853FE2949F69B5CC3D9271E"
+  },
+  {
+    "file": "models\\seat_t2.bin",
+    "sha256": "0D1F5A8871E82BDB7BF3668AF67956702EAFCED7F129AA0485996D3AC15BB1BC"
+  },
+  {
+    "file": "models\\seat_t2.bin.gz",
+    "sha256": "0A3D98BF829FC5871415AE5B8720B15461BC17D8EC470DE2B75B0FAF5F9AEB76"
+  },
+  {
+    "file": "models\\seat.bin",
+    "sha256": "5DBB389469F3AFE2411C540AB4BA561D4D286BE966171C51E3E7F27B78FE1D04"
+  },
+  {
+    "file": "models\\seat.bin.gz",
+    "sha256": "8BF1148831FFD4AC60039AEBEAB9BD6CC0F9708EF98390713430D05D1FCD2181"
+  },
+  {
+    "file": "models\\stand_connected_cage_mirrorleft.json",
+    "sha256": "FB5A48CDB68A474D6E49ACC7EC0706A74CEC03BC4EF3E7EE5881EFBA920D628B"
+  },
+  {
+    "file": "models\\stand_connected_cage_mirrorleft.json.gz",
+    "sha256": "9DA39C3D4F5F39E93FCE235DBED29640D4F6F9EA600D2B1F4E423944C53FA299"
+  },
+  {
+    "file": "models\\stand_connected_cage_rig.json",
+    "sha256": "60176CDA06C4A717B1905BD0BAA8DD95CC01B38455D430816CD427BA80979FF0"
+  },
+  {
+    "file": "models\\stand_connected_cage_rig.json.gz",
+    "sha256": "B67338C71A6E7CF2F1C2F58FB04AEA35B1C2D1D5077EEA100DF1C92E924FF710"
+  },
+  {
+    "file": "models\\stand_connected_rig_portrait.json",
+    "sha256": "3A1AF1F8E778BBACB0A5A2F22AC877DA70F81E7FCF875EA48142B03AE6F4D440"
+  },
+  {
+    "file": "models\\stand_connected_rig_portrait.json.gz",
+    "sha256": "A7AA620E182C6C27A5BCA60A348DB9EA739A6C155B0E92C07402B210504AFD83"
+  },
+  {
+    "file": "models\\stand_connected_rig_sections.json",
+    "sha256": "D6C023CEEF1507E9A578088282C59835C2E9FE0FDE8240651EEE7A8E9CEB080D"
+  },
+  {
+    "file": "models\\stand_connected_rig_sections.json.gz",
+    "sha256": "06A49C3166CC39909AAE63D2C2C65AF3E6D2A73A370CB88A8B0AFAB46BFE81DD"
+  },
+  {
+    "file": "models\\stand_connected_rig.json",
+    "sha256": "ECA85F9E584EB23719A33236CFF34BDC402EB256F53034178D6E178C1E247B10"
+  },
+  {
+    "file": "models\\stand_connected_rig.json.gz",
+    "sha256": "8B3CA18370A1D56E6BB016013E3C71451650EE654C577C2FBC0C23ECEA6B65D9"
+  }
+]

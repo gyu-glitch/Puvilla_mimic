@@ -637,3 +637,9 @@
 - Electron 포장만으로 속도가 개선되는 것은 아니므로, 기존Chrome 엔진에서 worker가 정상 작동하는 로컬HTTP 앱을 선택했다. https://www.electronjs.org/docs/latest/tutorial/process-model 및 https://developers.google.cn/edge/mediapipe/solutions/vision/pose_landmarker/web_js 공식 안내의 동기 추론/worker 권고와 일치. 주된 개선은 포장 자체가 아니라 렌더 스킵과 추론분리다.
 - 다운로드: https://nau-gyuchan.tailc22fe0.ts.net:10000/downloads/Puuvilla-v48-local.zip (HEAD200/길이확인). 실제카메라 개발주소 https://nau-gyuchan.tailc22fe0.ts.net:10000/?v=20261020-155418 .
 - 다음: 5070 현장에서 동일OBS·해상도·12fps·카메라조건으로 비교. 전체화면 해상도/동시OBS GPU부하/브라우저 GPU가속과 워커추론율에 따라 차이 가능. 느린장치에서 기존face worker 자동main전환 조건도 다음프로파일 대상이며 이번에 임의로 제거하지 않았다. 기존 팔/눈/첫pitch기준 정확도 문제는 별개로 남는다.
+
+### v48 공개 승격 (2026-10-21 사용자 명시 승인)
+
+- 공개 codex-promoted-20261020-155418 반영. 개발 immutable 빌드의 웹파일64개 SHA256 일치 확인 후 current.txt 원자 교체. 로컬ZIP downloads는 공개복사 제외. 공개HTTP config.build=codex-20261020-155418 확인. current.before-codex-v48.txt 및 current.swap-backup-v48.txt에 v47 보존. scripts/rollback-public-v48.ps1 기본 실행은 복구가능 검사, -Apply는 v48이활성일때만 v47로복구. 검사 READY 확인.
+- 승격 도중 PowerShell File.Replace에 null backup 인자를 전달하면 빈경로로 바인딩되는 실패 발생; 공개pointer는 v47로 그대로 남아 있었다. 실제backup경로를 지정해 수정 후 교체성공, rollback스크립트도 같은방식으로 수정.
+- 직후 사용자7672 빈전시장 허위락온 보고. 성능판 합격으로 마무리하지 않고 해당공개입력 오류를 이어서 조사한다. 공개원본/개발버전은 모두 보존.
