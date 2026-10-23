@@ -1,0 +1,27 @@
+{
+  "poseCadence": [
+    {
+      "intervalMs": 100,
+      "oldDroppedRenderFrames": 61,
+      "newDroppedRenderFrames": 0
+    },
+    {
+      "intervalMs": 200,
+      "oldDroppedRenderFrames": 121,
+      "newDroppedRenderFrames": 0
+    },
+    {
+      "intervalMs": 300,
+      "oldDroppedRenderFrames": 451,
+      "newDroppedRenderFrames": 0
+    },
+    {
+      "intervalMs": 400,
+      "oldDroppedRenderFrames": 451,
+      "newDroppedRenderFrames": 0
+    }
+  ],
+  "oldFaceExpiredFrames": 595,
+  "newFaceExpiredFrames": 0,
+  "missingPoseReleaseMs": 450
+}

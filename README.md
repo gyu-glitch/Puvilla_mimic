@@ -2,7 +2,7 @@
 
 웹캠 + MediaPipe Face Landmarker + Three.js(WebGL). 화면 앞 사람의 고개·표정(깜빡임·윙크·웃음·시무룩·입 벌림)을 3D 곰 푸빌라가 실시간으로 따라 하는 거울 인터랙션.
 
-현재 작업본은 Codex 개발본 **v49**입니다. 얼굴·상반신·팔 미믹, 입력 90도 회전, 출력 좌우반전, 추론 워커와 유화 렌더 최적화, 빈 공간의 몸 오검출에 대한 얼굴 확인 처리를 포함합니다.
+현재 작업본은 Codex 개발본 **v50**입니다. 얼굴·상반신·팔 미믹, 입력 90도 회전, 출력 좌우반전, 추론 워커와 유화 렌더 최적화, 빈 공간의 몸 오검출에 대한 얼굴 확인, 짧은 추론 누락 중 팔 자세 유지를 포함합니다.
 
 **이어서 개발하는 사람은 [AGENTS.md](./AGENTS.md), [docs/CONTINUOUS_REVIEW.md](./docs/CONTINUOUS_REVIEW.md), [docs/ARM_MIMIC.md](./docs/ARM_MIMIC.md)를 먼저 확인하세요.** 기존 [docs/HANDOFF.md](./docs/HANDOFF.md)와 [CLAUDE.md](./CLAUDE.md)는 초기 프로젝트 기록으로, 서버 경로·포트는 현재 작업본과 다를 수 있습니다.
 

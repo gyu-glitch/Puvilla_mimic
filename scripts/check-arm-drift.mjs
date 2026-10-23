@@ -34,6 +34,8 @@ for(const fps of [15,30,60]){
   assert.ok(a.armL>0&&a.armR>0,'stationary raised arms expired');
  }
  p.update(null,true,31000);
- assert.equal(p.update(raw,true,31050).armL,0,'low confidence reacquired a cleared anchor');
+ assert.ok(p.update(raw,true,31050).armL>0,'one missed inference cleared a confirmed gesture');
+ p.update(null,true,31500);
+ assert.equal(p.update(raw,true,31550).armL,0,'low confidence reacquired an expired anchor');
 }
 console.log(JSON.stringify(rows,null,2));

@@ -91,21 +91,20 @@ export class BodyProcessor {
     return this.last;
   }
 
-  /** Ordinary inference skips hold briefly; a fresh missing detection releases arms immediately. */
+  /** Missing whole-body inference is not an observed arm lowering. Hold the
+   * last accepted pose briefly; out-of-frame/invalid arm samples below still
+   * release independently. Neither empty results nor render ticks renew it. */
   update(raw: RawPose | null, fresh: boolean, nowMs: number): BodyPose | null {
-    if (!fresh) {
-      if (nowMs - this.lastSeenMs >= Math.min(240, this.cfg.body.lostHoldMs)) this.restArms();
-      return nowMs - this.lastSeenMs < this.cfg.body.lostHoldMs ? this.last : null;
-    }
-    if (!raw) {
-      this.restArms();
+    const dropoutHold = Math.min(450, this.cfg.body.lostHoldMs);
+    if (!fresh || !raw) {
+      if (nowMs - this.lastSeenMs >= dropoutHold) this.restArms();
       if (nowMs - this.lastSeenMs >= this.cfg.body.lostHoldMs) {
         this.last = null;
         this.bank.reset();
       }
       return this.last;
     }
-    if (nowMs - this.lastSeenMs > 240) this.restArms();
+    if (nowMs - this.lastSeenMs >= dropoutHold) this.restArms();
     const mirror = this.cfg.camera.mirror;
     const w = raw.world;
     const usable = (i: number) => w[i] && [w[i].x, w[i].y, w[i].z, w[i].visibility].every(Number.isFinite);
@@ -171,7 +170,7 @@ export class BodyProcessor {
       }
       else if (!state.active) {
         this.weakSince[s]=-Infinity;
-        if (!Number.isFinite(state.since) || nowMs - this.lastSeenMs > 240) {
+        if (!Number.isFinite(state.since) || nowMs - this.lastSeenMs >= dropoutHold) {
           state.since = nowMs; state.samples = 0;
         }
         state.samples++;

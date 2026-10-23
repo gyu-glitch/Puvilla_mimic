@@ -1,0 +1,31 @@
+<!doctype html><html lang="ko"><head><base href="/"><meta charset="utf-8"><title>v50 팔 검출 누락 비교</title>
+<style>body{margin:0;color:white;font:14px system-ui}#app{position:fixed;inset:0}nav{position:fixed;left:12px;top:12px;z-index:20;background:#17212dee;padding:12px;border-radius:8px}</style></head>
+<body><div id="app"></div><nav>합성 입력: 들기 → 짧은 검출 누락/느린 추론 → 내리기 → 퇴장<br>
+<button id="before">수정 전</button><button id="after">수정 후</button>
+<select id="view"><option value="0">정면</option><option value="-45">사선</option><option value="-90">측면</option></select>
+<button id="record">14초 영상 저장</button><button id="sample">6초 상태</button><div id="status"></div></nav>
+<script type="module">
+import {loadConfig} from '/src/config.ts';import {Scene} from '/src/scene.ts';import {Backdrop} from '/src/backdrop.ts';
+import {PuuvillaCharacter} from '/src/character/puuvilla.ts';import {NEUTRAL_PARAMS} from '/src/character/mapping.ts';
+import {BodyProcessor} from '/src/body.ts';import {BodyProcessor as OldBody} from '/dev/body-before-v50.ts';
+import {BodyTargetLock} from '/src/bodyTarget.ts';import {BodyTargetLock as OldLock} from '/dev/body-target-before-v50.ts';
+import {armSessionFixture} from '/dev/arm-session-fixture.ts';import {MimicStateMachine} from '/src/state.ts';import {emptySignal} from '/src/signals.ts';
+const cfg=await loadConfig();cfg.presence.mimicOnLock=true;cfg.presence.lockZone={x:0,y:0,w:1,h:1};cfg.scene.outputMirror=false;cfg.scene.layout='landscape';cfg.scene.viewHeightCm=140;cfg.scene.viewCenterCm=128;
+const scene=new Scene(document.querySelector('#app'),cfg.scene,cfg.character,cfg.filter),bg=new Backdrop({top:cfg.scene.bgTop,bottom:cfg.scene.bgBottom});await bg.set('winter',false);scene.backdrop=bg;
+const ch=await PuuvillaCharacter.load(cfg);scene.characterOutput.add(ch.root);ch.setShellCount(14);scene.ready=true;
+let fixed=true,proc,lock,fsm,track,nextPose,nextFace,start,last=performance.now(),frozen=false,sample,drops;
+function reset(){proc=fixed?new BodyProcessor(cfg):new OldBody(cfg);lock=fixed?new BodyTargetLock(cfg):new OldLock(cfg);fsm=new MimicStateMachine(cfg);track={faces:[],inferenceMs:1};nextPose=nextFace=0;start=performance.now();frozen=false;drops=0;}
+function input(t){const now=t*1000,raw=armSessionFixture(t<2?t:t<10?3:16+t-10,true).raw;const fresh=now>=nextPose;
+ if(fresh)nextPose=now+(t<6?100:300);
+ const missing=t>=12||(t>=2&&t<6&&Math.floor(t*10)%20===0);
+ const p=lock.update(missing?[]:[raw],null,fresh,now),body=proc.update(p,fresh,now);
+ if(now>=nextFace){track={faces:t<12?[{bbox:{cx:raw.nose.x,cy:raw.nose.y,w:.1,h:.1}}]:[],observedAtMs:now,inferenceMs:1};nextFace=now+(t<2?100:800);}
+ lock.observeFace(track,now);const ok=lock.confirmed(now);const state=fsm.update(emptySignal(),now,ok);
+ if(t>2&&t<10&&(!ok||!body?.armL||!body?.armR))drops++;
+ return {body:ok?body:null,state,t,ok,drops};}
+reset();document.querySelector('#before').onclick=()=>{fixed=false;reset();};document.querySelector('#after').onclick=()=>{fixed=true;reset();};
+document.querySelector('#view').onchange=e=>ch.root.rotation.y=Number(e.target.value)*Math.PI/180;
+document.querySelector('#sample').onclick=()=>{reset();for(let i=0;i<=300;i++){sample=input(i*.02);ch.setState(sample.state);ch.apply(NEUTRAL_PARAMS,.02,i*.02,sample.body);}frozen=true;};
+document.querySelector('#record').onclick=()=>{reset();const stream=scene.renderer.domElement.captureStream(24),chunks=[],rec=new MediaRecorder(stream,{mimeType:'video/webm'});rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download=`v50-${fixed?'after':'before'}-${document.querySelector('#view').value}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);stream.getTracks().forEach(t=>t.stop());};rec.start();setTimeout(()=>rec.stop(),14000);};
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;const s=frozen?sample:input(Math.min(14,(now-start)/1000));ch.setState(s.state);ch.apply(NEUTRAL_PARAMS,dt,now/1000,s.body);scene.render();document.querySelector('#status').textContent=`${fixed?'수정 후':'수정 전'} | ${s.t.toFixed(2)}초 | ${s.state.state} | 확인 ${s.ok} | 팔 ${s.body?.armL??0}/${s.body?.armR??0} | 유지구간 끊김 ${s.drops}`;requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script></body></html>

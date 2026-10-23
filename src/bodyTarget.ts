@@ -28,7 +28,11 @@ export class BodyTargetLock {
     this.recentFaces = track.faces;
     const hint = this.headHint(now);
     if (!hint || !track.faces.some(f => faceMatchesHint(f, hint, this.last!.imageAspect || 1))) return;
-    if (ts-this.previousFaceMatch <= 500) this.confirmedAt = ts;
+    // Acquisition/reacquisition needs two observations. Once confirmed, a
+    // fresh matching face renews the lease even when inference is < 2 Hz.
+    // Requiring a close pair on every renewal made a real visitor expire
+    // despite continued face detections on a slower or intermittently occluded input.
+    if (this.confirmed(now) || ts-this.previousFaceMatch <= 500) this.confirmedAt = ts;
     this.previousFaceMatch = ts;
   }
 

@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
+    "arm:dropout:check": "node --experimental-transform-types scripts/check-arm-dropout.mjs",
     "response:check": "node --experimental-transform-types scripts/check-neutral-response.mjs",
     "person:check": "node --experimental-transform-types scripts/check-person-acquisition.mjs",
     "lowering:check": "node --experimental-transform-types scripts/check-arm-lowering.mjs",
